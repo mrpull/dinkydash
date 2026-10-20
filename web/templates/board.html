@@ -269,13 +269,17 @@
         .week-events > * + * { margin-top: 0.3rem; }
         .week .chip { white-space: normal; font-size: 0.9rem; font-size: max(0.9rem, 12px); padding: 0.25rem 0.45rem; }
 
-        .month { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-template-rows: auto repeat(var(--weeks, 5), minmax(0, 1fr)); flex: 1 1 auto; min-height: 0; border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
-        .month-name { text-align: center; font-size: 0.8rem; font-size: max(0.8rem, 11px); font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); padding: 0.3rem 0; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-        .month-cell { border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 0.2rem 0.25rem; min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
-        .month-cell > * + * { margin-top: 0.12rem; }
-        .month-cell.outside { background: var(--box); opacity: 0.55; }
-        .month-num { font-size: 0.85rem; font-size: max(0.85rem, 11px); font-weight: 800; color: var(--text-mid); flex-shrink: 0; align-self: flex-start; padding: 0 0.3rem; line-height: 1.4; }
-        .month-cell.today .month-num { background: var(--accent); color: var(--bg); border-radius: 999px; }
+        /* The month borrows the week's cards: a tinted, rounded tile per day with
+           the same accent outline on today, separated by gaps rather than rules. */
+        .month { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-template-rows: auto repeat(var(--weeks, 5), minmax(0, 1fr)); grid-gap: 0.35rem; flex: 1 1 auto; min-height: 0; }
+        .month-name { font-size: 0.8rem; font-size: max(0.8rem, 11px); font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); padding: 0 0.5rem; }
+        .month-cell { background: var(--box); border-radius: 0.8rem; padding: 0.35rem 0.4rem 0.4rem; min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+        .month-cell > * + * { margin-top: 0.15rem; }
+        .month-cell.outside { background: transparent; opacity: 0.5; }
+        .month-cell.today { outline: 2px solid var(--accent); }
+        .month-num { font-size: 1.05rem; font-size: max(1.05rem, 12px); font-weight: 800; color: var(--text); flex-shrink: 0; align-self: flex-start; padding: 0 0.15rem; line-height: 1.25; }
+        .month-cell.today .month-num { color: var(--accent); }
+        .month .chip { border-radius: 0.4rem; }
 
         /* The sidebar. Icons are inline SVG; the active view is read off
            <html data-view>, so a refresh cannot leave the wrong one lit. */
