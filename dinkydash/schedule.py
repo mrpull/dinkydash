@@ -20,7 +20,7 @@ A brief that fails is simply due again on the next tick. That is the retry.
 import logging
 from datetime import datetime, time, timedelta, timezone
 
-from .config import is_set_up, tzinfo_for
+from .config import ai_headline_enabled, is_set_up, tzinfo_for
 
 log = logging.getLogger(__name__)
 
@@ -69,6 +69,8 @@ def brief_due(config, payload, now):
     hang it on the wall as the first thing they see. The moment the household
     is theirs and the clock is theirs, it is owed at any hour, as before.
     """
+    if not ai_headline_enabled(config):
+        return False
     if not payload.get("generated_for_date"):
         return is_set_up(config)
     local = now.astimezone(tzinfo_for(config))

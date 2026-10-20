@@ -544,3 +544,26 @@ class TestTwoWritersAtOnce:
         # the file is readable rather than torn.
         assert payload["headline"] == "Headline 39"
         assert payload["calendars_fetched_at"] == "2026-09-03T00:00:39+00:00"
+
+
+class TestAiHeadlineOff:
+    """With `ai_headline: false` nothing here may reach the model."""
+
+    @pytest.fixture
+    def off(self, config):
+        return {**config, "ai_headline": False}
+
+    def test_run_only_refreshes_the_calendars(self, home, store, off, monkeypatch):
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)  # a key must not be needed
+        monkeypatch.setattr(runner, "fetch_events", fake_fetch(EVENTS, OK_STATUS))
+        monkeypatch.setattr(runner, "generate",
+                            lambda *a, **k: pytest.fail("the model must not be called"))
+        result = runner.run(off, store, today=date(2026, 9, 3))
+        assert "headline" not in result
+        assert stored(home)["events"] == EVENTS
+
+    def test_write_brief_refuses(self, store, off, api_key, monkeypatch):
+        monkeypatch.setattr(runner, "generate",
+                            lambda *a, **k: pytest.fail("the model must not be called"))
+        with pytest.raises(runner.GenerationError):
+            runner.write_brief(off, store)

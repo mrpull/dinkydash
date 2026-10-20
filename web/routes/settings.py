@@ -444,6 +444,9 @@ def generate_now():
         log.exception("Generation failed")
         flash(f"Generation failed: {exc}", "error")
     else:
+        if "headline" not in payload:
+            flash("Calendars refreshed. AI headlines are switched off.", "ok")
+            return redirect(url_for("settings.home"))
         what = "Your first daily message is written" if first else "Daily message rewritten"
         flash(f"{what} — “{payload['headline']}”", "ok")
     return redirect(url_for("settings.home"))

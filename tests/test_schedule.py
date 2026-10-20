@@ -301,3 +301,27 @@ class TestSettings:
         assert parse_stamp("2026-09-03T10:00:00+02:00") == utc("2026-09-03 08:00")
         assert parse_stamp(None) is None
         assert parse_stamp("") is None
+
+
+class TestAiHeadlineOff:
+    """`ai_headline: false` means no brief is ever owed, whatever the clock says."""
+
+    OFF = {"timezone": "UTC", "ai_headline": False,
+           "people": [{"name": "Mia", "date_of_birth": "2017-03-15"}]}
+
+    def test_no_first_brief_is_owed(self):
+        from dinkydash.schedule import brief_due
+        assert brief_due(self.OFF, payload(), utc("2026-09-03 12:00")) is False
+
+    def test_no_daily_brief_is_owed_after_brief_time(self):
+        from dinkydash.schedule import brief_due
+        old = payload(generated_for="2026-09-02")
+        assert brief_due(self.OFF, old, utc("2026-09-03 12:00")) is False
+
+    def test_the_calendars_are_still_refreshed(self):
+        from dinkydash.schedule import due
+        assert due(self.OFF, payload(), utc("2026-09-03 12:00")) == {"refresh": True, "brief": False}
+
+    def test_on_by_default(self):
+        from dinkydash.config import ai_headline_enabled, with_defaults
+        assert ai_headline_enabled(with_defaults({})) is True

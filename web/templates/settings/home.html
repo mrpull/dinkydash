@@ -127,11 +127,13 @@
         is what lets a screen show it without signing in. You can change it later under The screen.
     </div>
     {% endif %}
+    {% if config.ai_headline is not sameas false %}
     <form class="inline-form" method="post" action="{{ url_for('settings.generate_now') }}" data-pending="Writing your daily message…">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         {# Keep this label in sync with the waiting screen in board.html. #}
         <button class="btn" type="submit">Write first daily message</button>
     </form>
+    {% endif %}
     <div class="hint">
         It writes itself within a few minutes anyway; this is the shortcut. Everything above can
         still be changed afterwards.
@@ -172,10 +174,12 @@
                a custom tab with an X on Android. The panel never follows this
                link; it opens the screen URL itself. #}
             <a class="btn outline" href="{{ board_link }}" target="_blank" rel="noopener">{{ icons.screen() }} View dashboard</a>
+            {% if config.ai_headline is not sameas false %}
             <form class="inline-form" method="post" action="{{ url_for('settings.generate_now') }}" data-pending="Writing your daily message…">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button class="btn outline" type="submit" {{ 'disabled' if status.state == 'lapsed' }}>Rewrite daily message</button>
             </form>
+            {% endif %}
         </div>
         {% if cloud %}
         {# The link and the QR code, from the card a parent looks at for them.

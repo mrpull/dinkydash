@@ -27,6 +27,10 @@ DEFAULTS = {
     "clock": DEFAULT_CLOCK,
     "location": "",
     "theme": "light",
+    # Whether the daily headline is written by the model. Off means no model call
+    # anywhere: not on the tick, not from "Rewrite daily message", not from
+    # `generate.py`. The calendars still refresh.
+    "ai_headline": True,
     # Which day the week and month views start on: monday or sunday.
     "week_start": "monday",
     "calendars": [],
@@ -49,6 +53,11 @@ DEFAULTS = {
 }
 
 THEMES = ("light", "dark")
+
+
+def ai_headline_enabled(config):
+    """False only when `ai_headline` is explicitly switched off."""
+    return config.get("ai_headline") is not False
 
 # Avatar colours the dashboard and the settings UI both understand. Names rather
 # than hex so a theme change doesn't strand a colour nobody can read.

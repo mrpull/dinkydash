@@ -126,6 +126,8 @@ def write_brief(config, store, today=None, client=None, budget=None):
     expensive to rewrite and a dashboard whose rewrite failed should both leave the
     screen on the wall showing yesterday, labelled stale.
     """
+    if not config_module.ai_headline_enabled(config):
+        raise GenerationError("AI headlines are switched off (ai_headline: false).")
     require_api_key()
     budget = budget or NoBudget()
     today = today or config_module.today_for(config)
@@ -175,6 +177,8 @@ def run(config, store, today=None, client=None, budget=None):
     dashboard cannot be rewritten today should still have an accurate agenda under
     yesterday's headline.
     """
+    if not config_module.ai_headline_enabled(config):
+        return refresh_calendars(config, store, today=today, budget=budget)
     require_api_key()  # before the fetch, so a missing key fails in a second
     refresh_calendars(config, store, today=today, budget=budget)
     return write_brief(config, store, today=today, client=client, budget=budget)

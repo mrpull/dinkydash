@@ -439,10 +439,11 @@ class TestTheBannerOnTheDashboard:
         assert self.BANNER not in page
         assert "An octopus fact" not in page
 
-    def test_the_morning_says_the_headline_was_worked_out(self, tmp_path, monkeypatch):
+    def test_the_morning_shows_no_headline_and_no_banner_about_one(self, tmp_path, monkeypatch):
         page = self.page_at(tmp_path, monkeypatch, 7, 0)
-        assert self.BANNER in page
-        assert "worked out from the day" in page
+        assert self.BANNER not in page
+        assert "worked out from the day" not in page
+        assert 'class="headline' not in page
         assert "An octopus fact" not in page
         assert "Yesterday&rsquo;s note" not in page
 
@@ -454,11 +455,11 @@ class TestTheBannerOnTheDashboard:
         assert "Older note" not in page
         assert "Yesterday" not in page
 
-    def test_an_agenda_with_no_brief_still_says_the_headline_is_missing(self, tmp_path, monkeypatch):
+    def test_an_agenda_with_no_brief_raises_no_banner(self, tmp_path, monkeypatch):
         agenda = {"events": [event("2026-09-03", "08:20", "School run")],
                   "calendars_fetched_at": "2026-09-03T00:10:00+00:00"}
         page = self.page_at(tmp_path, monkeypatch, 7, 0, data=agenda)
-        assert self.BANNER in page
+        assert self.BANNER not in page
         assert "older one below" not in page
 
 
@@ -494,7 +495,7 @@ class TestTheFactOfTheDayIsNotShown:
                           tzinfo=tzinfo_for({"timezone": "Europe/Berlin"}))
         monkeypatch.setattr(config_module, "now_for", lambda _: moment)
         page = client_for(create_app(FileStore(path))).get("/").get_data(as_text=True)
-        assert "Big morning" in page
+        assert "Big morning" not in page
         assert "A very long appointment title that has to wrap" in page
         assert "Set the table" in page
         assert "Did you know?" not in page

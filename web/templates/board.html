@@ -294,14 +294,6 @@
             .nav-btn { min-width: 3.4rem; padding: 0.4rem 0.5rem; }
         }
 
-        .headline {
-            font-size: 2.35rem;
-            font-weight: 800;
-            line-height: 1.14;
-            letter-spacing: -0.02em;
-            flex-shrink: 0;
-            overflow-wrap: break-word;
-        }
 
         /* Wide screens (a TV, a landscape tablet, the Pi panel) have width to
            spare, so the agenda and the side column sit next to each other and
@@ -619,13 +611,6 @@
 <div class="banner">
     Your trial or subscription has ended. Showing the last saved dashboard; its dates and turns are paused.
 </div>
-{% elif view.overdue %}
-{# The headline on screen is the one worked out from the day. The banner says
-   so, and only once this morning's brief was actually due. #}
-<div class="banner">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.6v5"></path><path d="M12 16.2h.01"></path></svg>
-    Today&rsquo;s headline hasn&rsquo;t arrived, so this one is worked out from the day. Everything else is today&rsquo;s.
-</div>
 {% endif %}
 
 <div class="shell">
@@ -656,10 +641,6 @@
         <div class="family">{{ view.family_name }}</div>
         <div class="date">{{ view.date_display }}</div>
     </div>
-
-    {% if view.headline %}
-    <div class="headline day-only">{{ view.headline }}</div>
-    {% endif %}
 
     <div class="body day-only{% if not view.events %} day-empty{% endif %}">
         <div class="agenda">

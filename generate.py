@@ -148,6 +148,9 @@ def tick(config, store, budget=None):
 
 
 def report(payload):
+    if "headline" not in payload:  # AI headlines off: only the calendars were refreshed
+        log.info("Calendars refreshed; AI headlines are off.")
+        return
     log.info("Headline: %s", payload["headline"])
     log.info("Note: %s", payload["note"])
 

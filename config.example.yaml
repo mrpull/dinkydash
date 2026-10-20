@@ -87,6 +87,10 @@ special_dates:
     emoji: "☀️"
     date: "07/01"
 
+# Whether the model writes the daily headline. Set to false to make no Claude
+# calls at all: the calendars still refresh, and the dashboard shows no headline.
+ai_headline: true
+
 # claude-haiku-4-5 costs roughly $0.13/month at one dashboard a day.
 # claude-sonnet-5 writes better for about three times that.
 claude_model: "claude-haiku-4-5"
