@@ -278,8 +278,10 @@ def home():
     tzinfo = config_module.tzinfo_for(config)
     clock = clock_of(config)
     # The first brief is due immediately; the next tick's timing depends on the host.
+    headlines = config_module.ai_headline_enabled(config)
     status = {"state": "waiting",
-              "detail": "No dashboard has been generated yet. The next run writes it."}
+              "detail": "No dashboard has been generated yet. The next run writes it." if headlines
+              else "No calendars have been fetched yet. The next refresh brings them in."}
     if payload:
         generated_for = payload.get("generated_for_date")
         written = _clock(payload.get("generated_at"), tzinfo, clock)
@@ -291,6 +293,9 @@ def home():
         # A refresh with no brief yet leaves a payload holding only the agenda,
         # so an unwritten dashboard stays "waiting" rather than claiming a date.
         fetched = _clock(payload.get("calendars_fetched_at"), tzinfo, clock)
+        if not headlines and payload.get("calendars_fetched_at"):
+            # Nothing is ever written with headlines off; the calendars are the dashboard.
+            status = {"state": "ready", "detail": "Showing your calendars."}
         if fetched:
             status["detail"] += f" Calendars refreshed {fetched}."
 

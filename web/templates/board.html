@@ -599,6 +599,19 @@
         .dm-title { font-weight: 700; font-size: 1.05rem; line-height: 1.25; overflow-wrap: break-word; }
         .dm-where { font-weight: 600; font-size: 0.85rem; line-height: 1.3; margin-top: 0.15rem; overflow-wrap: break-word; }
         .dm-ev.all-day { background: var(--c-bar); color: var(--bg); }
+        /* Settings, in a frame, over the dashboard. The pages inside are the ordinary
+           settings pages; they know they are framed and drop their own links out. */
+        .settings-modal { position: fixed; left: 0; top: 0; right: 0; bottom: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+        .settings-modal[hidden] { display: none; }
+        .settings-scrim { position: absolute; left: 0; top: 0; right: 0; bottom: 0; background: var(--scrim); }
+        .settings-card { position: relative; width: 100%; max-width: 760px; height: 100%; max-height: 880px; display: flex; flex-direction: column; background: var(--box); color: var(--text); border-radius: 1.1rem; overflow: hidden; box-shadow: 0 0 0 1px var(--line), 0 1rem 3rem var(--scrim); }
+        .settings-head { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; padding: 0.7rem 0.9rem 0.7rem 1.2rem; }
+        .settings-head h2 { font-size: 1.2rem; font-weight: 800; letter-spacing: -0.02em; }
+        .settings-frame { flex: 1 1 auto; min-height: 0; width: 100%; border: 0; background: #fffaf5; }
+        @media (max-width: 639px) {
+            .settings-modal { padding: 0; }
+            .settings-card { max-height: none; border-radius: 0; }
+        }
         .dm-empty { color: var(--text-muted); font-weight: 700; padding: 0.4rem 0; }
 
         /* Flex gap, where it exists. The shorthand on `.body` also sets the
@@ -700,14 +713,14 @@
         <svg class="moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"></path></svg>
         Theme
     </button>
-    {% if settings_url %}
-    {# Self-hosted only, and in its own tab: the dashboard reloads itself for years, so a panel that
-       followed this in place would be stranded on a settings page. A hosted screen has no session to
-       reach settings with, and is passed no link. #}
-    <a class="nav-btn" href="{{ settings_url }}" target="_blank" rel="noopener" aria-label="Settings">
+    {% if settings_url %}<!--settings:start-->
+    {# Self-hosted only. The script opens the settings pages in the modal below; without it the link
+       opens them in their own tab, so a dashboard that reloads itself is never left on a page that
+       does not. A hosted screen has no session to reach settings with, and is passed no link. #}
+    <a class="nav-btn" href="{{ settings_url }}" target="_blank" rel="noopener" aria-label="Settings" data-settings-open>
         <svg viewBox="0 0 24 24"><path d="M4 7h9M19 7h1M4 17h1M11 17h9"></path><circle cx="16" cy="7" r="2.6"></circle><circle cx="8" cy="17" r="2.6"></circle></svg>Settings
     </a>
-    {% endif %}
+    <!--settings:end-->{% endif %}
     {% if view.legend %}
     <div class="legend">
         {% for item in view.legend %}<div class="legend-item cal-{{ item.color }}"><span class="dot"></span>{{ item.label }}</div>{% endfor %}
@@ -822,6 +835,20 @@
         <div class="day-body"></div>
     </div>
 </div>
+{% if settings_url %}<!--settings:start-->
+<div class="settings-modal" hidden>
+    <div class="settings-scrim" data-settings-close></div>
+    <div class="settings-card" role="dialog" aria-modal="true" aria-labelledby="settings-heading">
+        <div class="settings-head">
+            <h2 id="settings-heading">Settings</h2>
+            <button type="button" class="day-close" data-settings-close aria-label="Close settings">
+                <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+            </button>
+        </div>
+        <iframe class="settings-frame" title="Settings"></iframe>
+    </div>
+</div>
+<!--settings:end-->{% endif %}
 
 {% endif %}
 
@@ -1088,12 +1115,57 @@
         if (dayFrom && dayFrom.focus && document.body.contains(dayFrom)) { dayFrom.focus(); }
         dayFrom = null;
     }
+    /* ---- the settings modal --------------------------------------------- */
+
+    var settingsFrom = null;
+
+    function settingsModal() { return document.querySelector(".settings-modal"); }
+    function settingsIsOpen() {
+        var modal = settingsModal();
+        return !!modal && !modal.hidden;
+    }
+    function openSettings(url, from) {
+        var modal = settingsModal();
+        if (!modal) { return false; }
+        modal.querySelector(".settings-frame").setAttribute("src", url);
+        modal.hidden = false;
+        settingsFrom = from || null;
+        modal.querySelector(".day-close").focus();
+        return true;
+    }
+    // Closing is the moment to show what changed, and to ask before throwing
+    // away a form somebody has half filled in.
+    function closeSettings() {
+        var modal = settingsModal();
+        if (!modal || modal.hidden) { return; }
+        var frame = modal.querySelector(".settings-frame");
+        try {
+            var inside = frame.contentWindow;
+            if (inside && inside.dinkydashDirty && inside.dinkydashDirty() &&
+                    !window.confirm("Discard your unsaved changes?")) { return; }
+        } catch (e) { /* a page we cannot read has nothing to protect */ }
+        modal.hidden = true;
+        frame.setAttribute("src", "about:blank");
+        if (settingsFrom && settingsFrom.focus && document.body.contains(settingsFrom)) { settingsFrom.focus(); }
+        settingsFrom = null;
+        later(1);   // the page's own timer: fetch the dashboard again and swap it in
+    }
+    // Esc pressed inside the frame cannot reach this document, so the page asks.
+    window.addEventListener("message", function (event) {
+        if (event.origin === window.location.origin && event.data &&
+                event.data.dinkydash === "close-settings" && settingsIsOpen()) { closeSettings(); }
+    });
+
     // Any touch of the open modal counts as somebody being there.
     ["mousedown", "touchstart", "keydown", "scroll"].forEach(function (name) {
         document.addEventListener(name, function () { if (openIso()) { armIdle(); } }, true);
     });
     document.addEventListener("keydown", function (event) {
         var key = event.key;
+        if (settingsIsOpen()) {
+            if (key === "Escape" || key === "Esc") { closeSettings(); }
+            return;
+        }
         if (openIso()) {
             if (key === "Escape" || key === "Esc") { closeDay(); }
             // Nothing in the card takes focus but its close button.
@@ -1110,6 +1182,12 @@
         var target = event.target && event.target.closest ? event.target : null;
         if (!target) { return; }
         if (target.closest("[data-day-close]")) { closeDay(); return; }
+        if (target.closest("[data-settings-close]")) { closeSettings(); return; }
+        var settingsLink = target.closest("[data-settings-open]");
+        if (settingsLink && !(event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)) {
+            if (openSettings(settingsLink.getAttribute("href"), settingsLink)) { event.preventDefault(); }
+            return;
+        }
         if (!openIso() && root.getAttribute("data-view") !== "day") {
             var cell = target.closest(".month-cell[data-date], .week-day[data-date]");
             if (cell) { openDay(cell.getAttribute("data-date"), cell); return; }
@@ -1222,6 +1300,9 @@
                 // Not a dashboard — some box between here and the server
                 // answered instead — counts as no copy at all.
                 if (!next.body || !next.body.hasAttribute("data-reload")) { throw new Error("not a dashboard"); }
+                // Swapping the body would tear the settings frame down mid-edit.
+                // The next attempt after it closes brings the changes in.
+                if (settingsIsOpen()) { later(reloadSeconds()); return; }
                 // A different version of the page is a deploy. The CSS and
                 // this script live in the head, which a swap keeps, so only a
                 // real reload brings them — safe now, and only now, because

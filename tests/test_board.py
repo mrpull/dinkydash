@@ -6,6 +6,7 @@ worked out from the day. A stored note stays on the view and is not rendered.
 """
 
 import json
+import re
 from datetime import date, datetime, timezone
 
 import pytest
@@ -791,3 +792,41 @@ class TestFirstRunWithHeadlinesOff:
         config = {"timezone": "Europe/Berlin", "people": []}
         fetched = {"calendars_fetched_at": "2026-09-03T08:00:00+00:00"}
         assert self.status(tmp_path, config, fetched)["in_progress"] is True
+
+
+class TestTheSettingsModal:
+    """Settings open in a frame over the self-hosted dashboard."""
+
+    @pytest.fixture
+    def page(self, tmp_path):
+        from dinkydash.store import FileStore
+        from tests.conftest import client_for
+        from web import create_app
+
+        path = tmp_path / "config.yaml"
+        path.write_text('family_name: "The Wilsons"\ntimezone: "Europe/Berlin"\n')
+        return client_for(create_app(FileStore(path))).get("/").get_data(as_text=True)
+
+    def test_the_modal_is_in_the_page_hidden_with_a_frame_that_loads_nothing_yet(self, page):
+        assert '<div class="settings-modal" hidden>' in page
+        assert '<iframe class="settings-frame" title="Settings"></iframe>' in page  # no src until opened
+
+    def test_the_sidebar_link_opens_it_and_still_works_without_script(self, page):
+        link = re.search(r'<a class="nav-btn"[^>]*data-settings-open[^>]*>', page).group(0)
+        assert 'href="/settings/"' in link and 'target="_blank"' in link
+
+    def test_a_refresh_never_swaps_the_page_out_from_under_an_open_frame(self, page):
+        script = page.split("<script>", 2)[-1]
+        assert script.index("settingsIsOpen()") < script.index("swap(next);")
+        assert "closeSettings" in script and "dinkydashDirty" in script
+
+    def test_the_settings_pages_know_when_they_are_framed(self, tmp_path):
+        from dinkydash.store import FileStore
+        from tests.conftest import client_for
+        from web import create_app
+
+        path = tmp_path / "config.yaml"
+        path.write_text('family_name: "The Wilsons"\ntimezone: "Europe/Berlin"\n')
+        page = client_for(create_app(FileStore(path))).get("/settings/").get_data(as_text=True)
+        assert "window.top === window.self" in page and "close-settings" in page
+        assert ".embedded .board-link" in page

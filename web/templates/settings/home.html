@@ -49,7 +49,7 @@
 {% if admin %}<a class="action muted" href="{{ url_for('admin.growth_page') }}">View admin</a>{% endif %}
 {# The dashboard link is "View dashboard" by another name, so it waits with it and
    opens its own tab for the same reason — see the button. #}
-{% if not setting_up %}<a class="action muted" href="{{ board_link }}" target="_blank" rel="noopener">Dashboard</a>{% endif %}
+{% if not setting_up %}<a class="action muted board-link" href="{{ board_link }}" target="_blank" rel="noopener">Dashboard</a>{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -179,7 +179,7 @@
                has to draw: a tab to close, an in-app sheet with Done on iOS,
                a custom tab with an X on Android. The panel never follows this
                link; it opens the screen URL itself. #}
-            <a class="btn outline" href="{{ board_link }}" target="_blank" rel="noopener">{{ icons.screen() }} View dashboard</a>
+            <a class="btn outline board-link" href="{{ board_link }}" target="_blank" rel="noopener">{{ icons.screen() }} View dashboard</a>
             {% if config.ai_headline is not sameas false %}
             <form class="inline-form" method="post" action="{{ url_for('settings.generate_now') }}" data-pending="Writing your daily message…">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -349,7 +349,7 @@
 {# Hidden until the script below decides it is worth showing: not already saved,
    and not waved away before. Not offered while setting up — a page somebody
    opened a minute ago is not one to keep yet. #}
-<div class="card pad" id="install-nudge" hidden style="display:flex;flex-direction:column;gap:0.75rem;">
+<div class="card pad embedded-hide" id="install-nudge" hidden style="display:flex;flex-direction:column;gap:0.75rem;">
     <div>
         <div style="font-size:0.9375rem;font-weight:800;">Keep this on your home screen</div>
         <div class="hint" style="margin-top:0.1875rem;">

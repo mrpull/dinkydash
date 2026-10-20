@@ -1021,3 +1021,22 @@ class TestTheControlsUnderAPointer:
     def test_a_persons_name_toggles_their_box(self, client):
         page = client.get("/settings/recurring/new").get_data(as_text=True)
         assert '<label for="p-1">Mia</label>' in page
+
+
+class TestTheStatusWithHeadlinesOff:
+    """With `ai_headline: false` nothing is written, so the card must not say it is waiting for that."""
+
+    def test_a_fetched_agenda_reads_as_showing_the_calendars(self, tmp_path):
+        path = tmp_path / "config.yaml"
+        path.write_text('family_name: "The Wilsons"\ntimezone: "Europe/Berlin"\nai_headline: false\n')
+        (tmp_path / "dashboard_data.json").write_text(json.dumps({
+            "calendars_fetched_at": "2026-09-03T08:00:00+00:00", "events": []}))
+        page = client_for(create_app(FileStore(path))).get("/settings/").get_data(as_text=True)
+        assert "Showing your calendars." in page
+        assert "No dashboard has been generated" not in page
+
+    def test_before_any_fetch_it_says_calendars_not_a_dashboard(self, tmp_path):
+        path = tmp_path / "config.yaml"
+        path.write_text('family_name: "The Wilsons"\ntimezone: "Europe/Berlin"\nai_headline: false\n')
+        page = client_for(create_app(FileStore(path))).get("/settings/").get_data(as_text=True)
+        assert "No dashboard has been generated" not in page

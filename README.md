@@ -48,7 +48,7 @@ A few things worth knowing:
 - **Each calendar gets its own colour**, by the order you list them in `config.yaml`, and an event keeps it in every view. On wide screens the sidebar names which colour is which.
 - **Start times show in the week views.** The month and 4 Weeks views show titles only, so a full grid stays readable. A day with more events than fit says "+3 more".
 - **Tap or click a day** in any view except Day to open the whole day in a card, with times and locations. It closes with the ✕, Esc or a tap outside, and on its own after a minute, so a wall screen is never left covered.
-- **The Settings link** at the foot of the sidebar opens the settings page in a new tab. It's on the self-hosted dashboard only; a hosted screen has no way into settings, on purpose.
+- **The Settings link** at the foot of the sidebar opens settings in a window over the dashboard. Close it with the ✕, Esc or a click outside, and it asks first if you've left something unsaved. It's on the self-hosted dashboard only; a hosted screen has no way into settings, on purpose.
 - **The Theme button** flips light and dark. The view and the theme you pick are remembered by that screen's browser, so a kitchen panel and a phone can differ. Until you pick, the `theme` in `config.yaml` decides.
 - **Weeks start on Monday.** Set `week_start: sunday` in `config.yaml` to change it. The 5 Day view is always Monday to Friday.
 

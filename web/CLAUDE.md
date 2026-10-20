@@ -346,12 +346,29 @@ own tab is a way back the page never has to draw: a tab to close, an in-app shee
 a custom tab with an X on Android. The same holds the other way: a panel that followed a link
 in place would be left on a settings page, which does not reload, because the reload keeps the URL.
 
-So the Settings link in the sidebar is **self-hosted only** and always `target="_blank"`.
-`render_board` takes a `settings_url`, and only the single-mode route passes one. A hosted screen is
-handed none, because it has no session: a tap would land on `/login`, which has no reload timer, and
-the wall would stay there. `tests/test_settings.py` asserts the tab and that it is the page's only
-link; `tests/test_cloud_mode.py` asserts that is the only way the two modes' pages differ besides the
-manifest.
+The Settings link in the sidebar is **self-hosted only**. `render_board` takes a `settings_url`, and
+only the single-mode route passes one; a hosted screen has no session to reach settings with. Its
+`href` stays a `target="_blank"` link, which is what runs without script. With script, a click opens
+the **settings modal**: the ordinary settings pages in an `<iframe>` over the dashboard, so nothing
+about them is built twice. The rules that keep that safe:
+
+- **The frame has no `src` until it is opened**, and goes back to `about:blank` on close, so a closed
+  modal costs nothing and a reopened one starts at the settings home.
+- **The pages know they are framed.** An inline script in `settings/base.html` adds `.embedded` to
+  `<html>` when `window.top !== window.self`, which hides the dashboard links, the feedback pill and
+  the install nudge (`.board-link`, `.feedback-dock`, `.embedded-hide`) — all of them sensible only
+  full-page. Esc inside the frame cannot reach the dashboard's document, so the page posts
+  `close-settings` to its parent, and the parent accepts it only from its own origin.
+- **Closing asks before it discards.** `settings.js` exposes `window.dinkydashDirty`, and the modal
+  confirms when the frame reports unsaved changes. Closing then fetches the dashboard again, so a new
+  person or calendar shows at once.
+- **A refresh never swaps the body while the modal is open** (`settingsIsOpen()` in `refresh`), because
+  that would tear the frame down mid-edit and lose what somebody was typing.
+
+`tests/test_settings.py` asserts the tab and that it is the dashboard's only link; `tests/test_board.py`
+asserts the modal, the lazy frame and the refresh guard; `tests/test_cloud_mode.py` asserts that the
+modal and the link (marked `<!--settings:start-->`) are the only differences between the two modes' pages
+besides the manifest.
 
 **Copy and Share beside the screen link are the browser's own** — `navigator.clipboard` and
 `navigator.share`, in `settings/_screen_link.html`. Nothing is fetched and nothing leaves the page

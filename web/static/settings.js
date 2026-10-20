@@ -11,6 +11,9 @@
     const dirty = () => guarded.some(form => form.dataset.dirtyGuard === 'changed'
         || values(form) !== originals.get(form));
 
+    // Read by the dashboard's settings modal before it closes the frame.
+    window.dinkydashDirty = dirty;
+
     function beforeUnload(event) {
         if (!leaving && dirty()) {
             event.preventDefault();

@@ -484,6 +484,19 @@
            rounded shape and a ring around either would overhang the other. */
         .feedback .open:focus-visible, .feedback .dismiss:focus-visible { outline-offset: -2px; }
     </style>
+    {# Framed by the dashboard's settings modal, the pages drop what only makes sense full-page. #}
+    <script>
+    (function () {
+        try { if (window.top === window.self) { return; } } catch (e) {}
+        document.documentElement.className += " embedded";
+        document.addEventListener("keydown", function (event) {
+            if (event.key === "Escape") { window.parent.postMessage({dinkydash: "close-settings"}, window.location.origin); }
+        });
+    })();
+    </script>
+    <style>
+        .embedded .board-link, .embedded .feedback-dock, .embedded .embedded-hide { display: none !important; }
+    </style>
 </head>
 <body>
 <div class="shell">

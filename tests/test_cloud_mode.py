@@ -250,8 +250,9 @@ class TestABoardOutOfPostgres:
         change must work in both" exists to prevent.
 
         **Two things are allowed to differ, and only two.** The first is the Settings
-        link in the sidebar: a self-hosted page is handed one, and a wall panel
-        has no session to reach settings with, so a hosted screen is handed none.
+        link in the sidebar and the modal it opens: a self-hosted page is handed
+        one, and a wall panel has no session to reach settings with, so a hosted
+        screen is handed none.
         The second is the `<link rel=manifest>`. A wall panel reaches its manifest at
         `/s/<token>/manifest.webmanifest`, because the signed-in one is behind
         the session and would hand a tablet a redirect to `/login` instead of a
@@ -277,8 +278,7 @@ class TestABoardOutOfPostgres:
         from_rows = client.get(board_path(pg_pool, pg_family)).get_data(as_text=True)
 
         manifest = re.compile(r'<link rel="manifest" href="[^"]+">')
-        settings = re.compile(r'\s*<a class="nav-btn" href="[^"]+" target="_blank" rel="noopener" '
-                              r'aria-label="Settings">.*?</a>', re.S)
+        settings = re.compile(r'\s*<!--settings:start-->.*?<!--settings:end-->', re.S)
         assert manifest.search(from_file) and manifest.search(from_rows)
         assert settings.search(from_file) and not settings.search(from_rows)
 
