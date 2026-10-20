@@ -1,5 +1,5 @@
 {% macro event_row(event) %}
-<div class="event">
+<div class="event cal-{{ event.color or 'blue' }}">
     <div class="event-time{{ ' all-day' if event.all_day }}">
         {%- if event.all_day -%}
             All day
@@ -12,13 +12,27 @@
         {%- endif -%}
     </div>
     <div class="event-title">
-        {{ event.title }}
+        <span class="dot"></span>{{ event.title }}
         {% if event.location %}<span class="event-where">&mdash; {{ event.location }}</span>{% endif %}
     </div>
 </div>
 {% endmacro -%}
+{% macro chip(event) %}
+<div class="chip cal-{{ event.color }}{{ ' all-day' if event.all_day }}" title="{{ event.calendar }}"><span class="chip-time">{% if not event.all_day %}{{ event.time }}{% endif %}</span> {{ event.title }}</div>
+{% endmacro -%}
+{# One colour per calendar, shared by every view: name -> light bar, light rgb,
+   light text, dark bar, dark rgb, dark text. #}
+{% set palette = {
+    'blue':   ('#2f6fd6', '47,111,214',  '#1f4fa0', '#5b9bff', '91,155,255',  '#9cc3ff'),
+    'green':  ('#2e8b57', '46,139,87',   '#1d6b40', '#4cc28a', '76,194,138',  '#8fe0b7'),
+    'purple': ('#7c5cbf', '124,92,191',  '#6b4fa8', '#a98de0', '169,141,224', '#c9b5f0'),
+    'pink':   ('#d6457a', '214,69,122',  '#a82a5c', '#f07aa5', '240,122,165', '#f7a8c4'),
+    'teal':   ('#1b8a8f', '27,138,143',  '#126569', '#3fc1c6', '63,193,198',  '#8fe0e3'),
+    'amber':  ('#c98a12', '201,138,18',  '#8a5a00', '#f0b43c', '240,180,60',  '#f6cf7c'),
+    'orange': ('#e85d24', '232,93,36',   '#b44314', '#ff8a55', '255,138,85',  '#ffb48f'),
+} -%}
 <!doctype html>
-<html lang="en" data-theme="{{ view.theme }}" data-clock="{{ view.clock }}">
+<html lang="en" data-theme="{{ view.theme }}" data-clock="{{ view.clock }}" data-view="day">
 <head>
     <meta charset="utf-8">
     <title>{{ view.family_name or "DinkyDash" }}</title>
@@ -42,6 +56,20 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="{{ '#17120f' if view.theme == 'dark' else '#ffffff' }}">
     {% include "_fonts.html" %}
+    {# This screen's own choices, applied before the first paint so a dark
+       screen does not flash light. Per device on purpose: the wall panel and a
+       phone can differ. Storage can be unavailable, and then the family's
+       setting and the day view are what show. #}
+    <script data-prefs>
+    (function () {
+        try {
+            var r = document.documentElement;
+            var v = localStorage.getItem("dd-view"), t = localStorage.getItem("dd-theme");
+            if (v === "day" || v === "week" || v === "month") { r.setAttribute("data-view", v); }
+            if (t === "light" || t === "dark") { r.setAttribute("data-theme", t); }
+        } catch (e) {}
+    })();
+    </script>
     <style>
         /* Light is the default palette; dark redefines the same tokens so every
            rule below is written once. */
@@ -60,6 +88,8 @@
             --warn-bg: #fdf6e7;
             --warn-fg: #b45309;
             --stale-box: #faf6f1;
+            --line: #eadfd3;
+            --side-bg: #fff5ec;
             /* The agenda's time column. It does not shrink, so it is sized for
                the widest time that clock can write, and today and tomorrow
                share the left edge it sets. */
@@ -81,6 +111,8 @@
             --warn-bg: #3a2c14;
             --warn-fg: #f2b968;
             --stale-box: #221b16;
+            --line: #3a2e26;
+            --side-bg: #241c17;
         }
 
         /* The suffix is a smaller span, so the column is the width of "12:00"
@@ -90,6 +122,12 @@
            front of the title. Tomorrow scales the token with its type. */
         [data-clock="12h"] { --time-column: 7.35rem; }
         [data-clock="12h"] .event-time { text-align: right; }
+
+        /* A calendar's colour, set once per element and read by every view. */
+        {% for name, c in palette.items() %}
+        .cal-{{ name }} { --c-bar: {{ c[0] }}; --c-bg: rgba({{ c[1] }}, 0.13); --c-fg: {{ c[2] }}; }
+        [data-theme="dark"] .cal-{{ name }} { --c-bar: {{ c[3] }}; --c-bg: rgba({{ c[4] }}, 0.2); --c-fg: {{ c[5] }}; }
+        {% endfor %}
 
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -118,8 +156,12 @@
             -webkit-font-smoothing: antialiased;
         }
 
+        /* The sidebar and the board. Stacked on a narrow or portrait screen with
+           the sidebar as a bar across the top; beside each other on a wide one. */
+        .shell { flex-grow: 1; min-height: 0; display: flex; flex-direction: column; }
         .board {
             flex-grow: 1;
+            min-width: 0;
             min-height: 0;
             display: flex;
             flex-direction: column;
@@ -145,7 +187,7 @@
             font-weight: 700;
             flex-shrink: 0;
         }
-        .banner + .board { padding-top: 1.6rem; }
+        .banner + .shell .board { padding-top: 1.6rem; }
         .banner svg { flex-shrink: 0; width: 1.05rem; height: 1.05rem; margin-right: 0.7rem; }
 
         .head {
@@ -163,6 +205,94 @@
             color: var(--accent);
         }
         .date { font-size: 1.1rem; font-weight: 700; color: var(--text-muted); }
+
+        /* Which view shows is data-view on <html>, which a refresh keeps. */
+        .view-week, .view-month { display: none; }
+        [data-view="week"] .day-only, [data-view="month"] .day-only { display: none; }
+        [data-view="week"] .view-week, [data-view="month"] .view-month {
+            display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0;
+        }
+        .view-title { font-size: 1.9rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 0.7rem; flex-shrink: 0; }
+
+        .dot {
+            display: inline-block; width: 0.55em; height: 0.55em; border-radius: 50%;
+            background: var(--c-bar); margin-right: 0.45em; vertical-align: 0.08em;
+        }
+
+        .chip {
+            border-left: 0.2rem solid var(--c-bar);
+            background: var(--c-bg);
+            color: var(--c-fg);
+            border-radius: 0.3rem;
+            padding: 0.12rem 0.4rem;
+            font-size: 0.78rem; font-size: max(0.78rem, 11px);
+            font-weight: 700;
+            line-height: 1.25;
+            overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+            flex-shrink: 0;
+        }
+        .chip.all-day { background: var(--c-bar); color: var(--bg); }
+        .chip-time { font-weight: 800; }
+        .chip-time:empty { display: none; }
+        .more-chip { font-size: 0.75rem; font-size: max(0.75rem, 11px); font-weight: 800; color: var(--text-muted); padding-left: 0.4rem; flex-shrink: 0; }
+
+        .week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-gap: 0.5rem; flex: 1 1 auto; min-height: 0; }
+        .week-day { background: var(--box); border-radius: 0.8rem; padding: 0.55rem; display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
+        .week-day.today { outline: 2px solid var(--accent); }
+        .week-day-head { display: flex; align-items: baseline; margin-bottom: 0.45rem; flex-shrink: 0; }
+        .week-day-head > * + * { margin-left: 0.35rem; }
+        .wd-name { font-size: 0.82rem; font-size: max(0.82rem, 12px); font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); }
+        .wd-num { font-size: 1.5rem; font-weight: 800; }
+        .week-day.today .wd-num { color: var(--accent); }
+        .week-events { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+        .week-events > * + * { margin-top: 0.3rem; }
+        .week .chip { white-space: normal; font-size: 0.9rem; font-size: max(0.9rem, 12px); padding: 0.25rem 0.45rem; }
+
+        .month { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-template-rows: auto repeat(var(--weeks, 5), minmax(0, 1fr)); flex: 1 1 auto; min-height: 0; border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+        .month-name { text-align: center; font-size: 0.8rem; font-size: max(0.8rem, 11px); font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); padding: 0.3rem 0; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+        .month-cell { border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 0.2rem 0.25rem; min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+        .month-cell > * + * { margin-top: 0.12rem; }
+        .month-cell.outside { background: var(--box); opacity: 0.55; }
+        .month-num { font-size: 0.85rem; font-size: max(0.85rem, 11px); font-weight: 800; color: var(--text-mid); flex-shrink: 0; align-self: flex-start; padding: 0 0.3rem; line-height: 1.4; }
+        .month-cell.today .month-num { background: var(--accent); color: var(--bg); border-radius: 999px; }
+
+        /* The sidebar. Icons are inline SVG; the active view is read off
+           <html data-view>, so a refresh cannot leave the wrong one lit. */
+        .side-nav { background: var(--side-bg); display: flex; flex-direction: row; align-items: center; padding: 0.5rem 1rem; flex-shrink: 0; }
+        .side-nav > * + * { margin-left: 0.5rem; }
+        .nav-btn { appearance: none; border: 0; background: transparent; color: var(--text-muted); font: inherit; font-weight: 800; font-size: 0.78rem; font-size: max(0.78rem, 11px); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.55rem 0.7rem; border-radius: 0.8rem; cursor: pointer; min-width: 4.2rem; }
+        .nav-btn svg { width: 1.5rem; height: 1.5rem; margin-bottom: 0.2rem; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+        .nav-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+        [data-view="day"] [data-view-set="day"], [data-view="week"] [data-view-set="week"], [data-view="month"] [data-view-set="month"] { background: var(--accent); color: var(--bg); }
+        .nav-spacer { flex: 1 1 auto; }
+        .theme-btn .moon { display: none; }
+        [data-theme="dark"] .theme-btn .sun { display: none; }
+        [data-theme="dark"] .theme-btn .moon { display: block; }
+        .legend { display: none; }
+        @media (min-aspect-ratio: 5/4) and (min-width: 640px) {
+            .shell { flex-direction: row; }
+            .side-nav { flex-direction: column; padding: 1.2rem 0.7rem; width: 6.4rem; align-items: stretch; }
+            .side-nav > * + * { margin-left: 0; margin-top: 0.4rem; }
+            .legend { display: block; margin-top: 0.6rem; }
+            .legend-item { display: flex; align-items: center; font-size: 0.72rem; font-size: max(0.72rem, 11px); font-weight: 700; color: var(--text-muted); line-height: 1.2; margin-top: 0.4rem; }
+            .legend-item .dot { flex-shrink: 0; margin-right: 0.4rem; }
+        }
+        /* Narrow screens: a week of seven columns cannot read, so it becomes a
+           list of days. */
+        @media (max-width: 639px) {
+            /* The list is taller than the screen on a busy week, so the view
+               scrolls rather than clipping each day to one event. */
+            .view-week { overflow-y: auto; }
+            .week { grid-template-columns: minmax(0, 1fr); grid-auto-rows: auto; flex: 0 0 auto; overflow: visible; }
+            .week-day { flex-direction: row; align-items: flex-start; overflow: visible; }
+            .week-events { overflow: visible; }
+            /* Seven columns of text cannot be read at this width; each event
+               becomes a colour bar and the week view has the words. */
+            .month .chip { font-size: 0; height: 0.4rem; padding: 0; border-left-width: 0; }
+            .week-day-head { flex-direction: column; align-items: flex-start; width: 3.2rem; flex-shrink: 0; margin-bottom: 0; }
+            .week-events { flex: 1 1 auto; }
+            .nav-btn { min-width: 3.4rem; padding: 0.4rem 0.5rem; }
+        }
 
         .headline {
             font-size: 2.35rem;
@@ -498,6 +628,29 @@
 </div>
 {% endif %}
 
+<div class="shell">
+<nav class="side-nav" aria-label="Views">
+    <button type="button" class="nav-btn" data-view-set="day" aria-label="Day">
+        <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2.5"></rect><path d="M4 10h16M9 3v4M15 3v4"></path><circle cx="12" cy="15" r="1.4"></circle></svg>Day
+    </button>
+    <button type="button" class="nav-btn" data-view-set="week" aria-label="Week">
+        <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2.5"></rect><path d="M4 10h16M9 3v4M15 3v4M8.5 14h7"></path></svg>Week
+    </button>
+    <button type="button" class="nav-btn" data-view-set="month" aria-label="Month">
+        <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2.5"></rect><path d="M4 10h16M9 3v4M15 3v4M9 14h.01M12 14h.01M15 14h.01M9 17h.01M12 17h.01"></path></svg>Month
+    </button>
+    <div class="nav-spacer"></div>
+    <button type="button" class="nav-btn theme-btn" data-theme-toggle aria-label="Switch between light and dark">
+        <svg class="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"></circle><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"></path></svg>
+        <svg class="moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"></path></svg>
+        Theme
+    </button>
+    {% if view.legend %}
+    <div class="legend">
+        {% for item in view.legend %}<div class="legend-item cal-{{ item.color }}"><span class="dot"></span>{{ item.label }}</div>{% endfor %}
+    </div>
+    {% endif %}
+</nav>
 <div class="board">
     <div class="head">
         <div class="family">{{ view.family_name }}</div>
@@ -505,10 +658,10 @@
     </div>
 
     {% if view.headline %}
-    <div class="headline">{{ view.headline }}</div>
+    <div class="headline day-only">{{ view.headline }}</div>
     {% endif %}
 
-    <div class="body{% if not view.events %} day-empty{% endif %}">
+    <div class="body day-only{% if not view.events %} day-empty{% endif %}">
         <div class="agenda">
             {% if view.events %}
             <div class="label">Today</div>
@@ -569,6 +722,40 @@
             {% endif %}
         </div>
     </div>
+
+    {% if view.week %}
+    <section class="view-week" aria-label="Week">
+        <div class="view-title">{{ view.week.title }}</div>
+        <div class="week">
+            {% for day in view.week.days %}
+            <div class="week-day{{ ' today' if day.is_today }}">
+                <div class="week-day-head"><span class="wd-name">{{ day.weekday }}</span><span class="wd-num">{{ day.num }}</span></div>
+                <div class="week-events">
+                    {% for e in day.events %}{{ chip(e) }}{% endfor %}
+                    {% if day.more %}<div class="more-chip">+{{ day.more }} more</div>{% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if view.month %}
+    <section class="view-month" aria-label="Month">
+        <div class="view-title">{{ view.month.title }}</div>
+        <div class="month" style="--weeks: {{ view.month.weeks|length }}">
+            {% for name in view.month.weekdays %}<div class="month-name">{{ name }}</div>{% endfor %}
+            {% for week in view.month.weeks %}{% for cell in week %}
+            <div class="month-cell{{ ' today' if cell.is_today }}{{ '' if cell.in_month else ' outside' }}">
+                <div class="month-num">{{ cell.num }}</div>
+                {% for e in cell.events %}{{ chip(e) }}{% endfor %}
+                {% if cell.more %}<div class="more-chip">+{{ cell.more }} more</div>{% endif %}
+            </div>
+            {% endfor %}{% endfor %}
+        </div>
+    </section>
+    {% endif %}
+</div>
 </div>
 
 {% endif %}
@@ -668,10 +855,30 @@
         }
     }
 
+    // The week and month are grids that fill the screen and clip rather than
+    // shed rows, so they need no search: one size off the height is enough.
+    // Wrapped text makes height non-monotonic in the type size, so the search
+    // below can settle on a size that overflows. Checked after it, and stepped
+    // down until the day fits or the floor is reached.
     function fit() {
+        fitOnce();
+        if (root.getAttribute("data-view") !== "day") { return; }
+        if (window.visualViewport && window.visualViewport.scale > 1) { return; }
+        var room = window.innerHeight, size = parseFloat(root.style.fontSize);
+        for (var i = 0; i < 24 && size > 11 && naturalHeight() > room; i++) {
+            size = Math.max(11, size * 0.98);
+            root.style.fontSize = size + "px";
+        }
+    }
+
+    function fitOnce() {
         // Let a phone viewer enlarge the dashboard without shrinking it back.
         if (window.visualViewport && window.visualViewport.scale > 1) return;
         var room = window.innerHeight;
+        if (root.getAttribute("data-view") !== "day") {
+            root.style.fontSize = Math.max(11, Math.min(26, room / 34, window.innerWidth / 20)) + "px";
+            return;
+        }
         clearShed();
         // A comfortable day fits at or above the floor and stops here. The
         // stylesheet font-size is only what a browser with scripting off gets.
@@ -692,6 +899,44 @@
         trimToday(room);
         if (!fitSize(room, FLOOR)) fitSize(room, 11);
     }
+
+    /* ---- the sidebar ---------------------------------------------------- */
+
+    // Delegated, because a refresh replaces the body and the buttons with it.
+    function remember(key, value) {
+        try { localStorage.setItem(key, value); } catch (e) {}
+    }
+    function storedTheme() {
+        try {
+            var t = localStorage.getItem("dd-theme");
+            return (t === "light" || t === "dark") ? t : null;
+        } catch (e) { return null; }
+    }
+    function paintTheme(theme) {
+        root.setAttribute("data-theme", theme);
+        var colour = document.querySelector('meta[name="theme-color"]');
+        if (colour) { colour.setAttribute("content", theme === "dark" ? "#17120f" : "#ffffff"); }
+    }
+    document.addEventListener("click", function (event) {
+        var target = event.target && event.target.closest ? event.target : null;
+        if (!target) { return; }
+        var viewButton = target.closest("[data-view-set]");
+        if (viewButton) {
+            var chosen = viewButton.getAttribute("data-view-set");
+            root.setAttribute("data-view", chosen);
+            remember("dd-view", chosen);
+            fit();
+            // Measured again once the browser has laid the new view out: the
+            // first pass after a switch can run on the old view's geometry.
+            if (window.requestAnimationFrame) { window.requestAnimationFrame(fit); }
+            return;
+        }
+        if (target.closest("[data-theme-toggle]")) {
+            var next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+            paintTheme(next);
+            remember("dd-theme", next);
+        }
+    });
 
     fit();
     window.addEventListener("resize", fit);
@@ -809,12 +1054,14 @@
     function swap(next) {
         // Both live on <html>, which a swap keeps, so each has to be carried
         // across by hand or the new body is drawn with the old chrome.
-        root.setAttribute("data-theme", next.documentElement.getAttribute("data-theme") || "light");
+        // This screen's own choice wins over the family's setting.
+        var mine = storedTheme();
+        root.setAttribute("data-theme", mine || next.documentElement.getAttribute("data-theme") || "light");
         root.setAttribute("data-clock", next.documentElement.getAttribute("data-clock") || "24h");
         document.title = next.title;
         var colour = document.querySelector('meta[name="theme-color"]');
         var nextColour = next.querySelector('meta[name="theme-color"]');
-        if (colour && nextColour) { colour.setAttribute("content", nextColour.getAttribute("content")); }
+        if (colour && nextColour && !mine) { colour.setAttribute("content", nextColour.getAttribute("content")); }
         // A parsed document's scripts never run, and this one is already running.
         var scripts = next.body.querySelectorAll("script");
         for (var i = 0; i < scripts.length; i++) { scripts[i].parentNode.removeChild(scripts[i]); }

@@ -31,7 +31,7 @@ from datetime import datetime, timedelta, timezone
 
 from . import config as config_module
 from .budget import NoBudget
-from .calendars import fetch_events, sort_key
+from .calendars import DAYS_BEHIND, MIN_DAYS_AHEAD, fetch_events, sort_key
 from .claude_client import GenerationError
 from .generate import generate
 
@@ -52,9 +52,13 @@ def refresh_calendars(config, store, now=None, today=None, budget=None):
     tzinfo = config_module.tzinfo_for(config)
     today = today or now.astimezone(tzinfo).date()
 
-    days_ahead = int(config.get("calendar_days_ahead") or 14)
+    # The window is wider than the family's setting so the week and month views
+    # have their whole grid; the setting still decides when a change in it
+    # invalidates the stored agenda (`store.calendar_config`).
+    days_ahead = max(int(config.get("calendar_days_ahead") or 14), MIN_DAYS_AHEAD)
     events, statuses = fetch_events(
         config.get("calendars"), today, tzinfo, days_ahead=days_ahead,
+        days_behind=DAYS_BEHIND,
     )
 
     # Read only to find out what a failing feed last gave us. Nothing from this
@@ -65,7 +69,8 @@ def refresh_calendars(config, store, now=None, today=None, budget=None):
     if failed:
         log.warning("Calendars that did not answer: %s", ", ".join(sorted(failed)))
         events = _with_last_known(events, previous, failed,
-                                  today, today + timedelta(days=days_ahead))
+                                  today - timedelta(days=DAYS_BEHIND),
+                                  today + timedelta(days=days_ahead))
 
     agenda = {
         "events": events,

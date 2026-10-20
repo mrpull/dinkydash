@@ -28,6 +28,11 @@ from recurring_ical_events import of as recurring_events_of
 log = logging.getLogger(__name__)
 
 DEFAULT_DAYS_AHEAD = 14
+# The month view draws whole weeks, so on the 31st it needs the first of the
+# month's week behind today and on the 1st it needs the last one ahead. The
+# fetch reaches this far whatever `calendar_days_ahead` says.
+DAYS_BEHIND = 37
+MIN_DAYS_AHEAD = 45
 DEFAULT_TIMEOUT = 30
 
 # A calendar feed the size of a fortnight's appointments is tens of kilobytes.
@@ -436,13 +441,14 @@ def feed_label(entry):
 
 
 def fetch_events(calendars, today, tzinfo, days_ahead=DEFAULT_DAYS_AHEAD,
-                 timeout=DEFAULT_TIMEOUT):
+                 timeout=DEFAULT_TIMEOUT, days_behind=0):
     """Fetch every enabled feed and merge into one ordered agenda.
 
     One broken feed must not empty the dashboard, so a failing feed is logged and
     skipped. The second return value reports per-feed status so the settings
     page can show which one needs attention.
     """
+    start = today - timedelta(days=days_behind)
     end = today + timedelta(days=days_ahead)
     merged = []
     statuses = []
@@ -458,7 +464,7 @@ def fetch_events(calendars, today, tzinfo, days_ahead=DEFAULT_DAYS_AHEAD,
             continue
         wanted = addresses(entry.get("shared_with"))
         try:
-            events = fetch_feed(url, today, end, tzinfo, label=label, timeout=timeout,
+            events = fetch_feed(url, start, end, tzinfo, label=label, timeout=timeout,
                                 shared_with=wanted)
         except FeedError as exc:
             log.warning("Calendar %r failed: %s", label, exc)

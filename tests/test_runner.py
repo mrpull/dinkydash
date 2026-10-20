@@ -86,9 +86,10 @@ def write_stored(home, payload):
 
 
 def fake_fetch(events, statuses, seen=None):
-    def _fetch(calendars, today, tzinfo, days_ahead=14, timeout=30):
+    def _fetch(calendars, today, tzinfo, days_ahead=14, timeout=30, days_behind=0):
         if seen is not None:
-            seen.append({"calendars": calendars, "today": today, "days_ahead": days_ahead})
+            seen.append({"calendars": calendars, "today": today, "days_ahead": days_ahead,
+                         "days_behind": days_behind})
         return list(events), list(statuses)
     return _fetch
 
@@ -116,7 +117,9 @@ class TestRefreshCalendars:
         runner.refresh_calendars(config, store,
                                  now=datetime(2026, 9, 3, 23, 30, tzinfo=timezone.utc))
         assert seen[0]["today"] == date(2026, 9, 4)
-        assert seen[0]["days_ahead"] == 14
+        # Wider than the family's 14 days, so the month view has its whole grid.
+        assert seen[0]["days_ahead"] == 45
+        assert seen[0]["days_behind"] == 37
 
     def test_it_leaves_the_brief_alone(self, home, store, config, monkeypatch):
         # The state the dashboard labels amber: today's times under yesterday's words.
@@ -178,9 +181,9 @@ class TestRefreshCalendars:
         # keeping a growing tail of appointments that already happened.
         write_stored(home, {"events": EVENTS})
         monkeypatch.setattr(runner, "fetch_events", fake_fetch([], FAILED_STATUS))
-        # A month on, 2026-09-03 is behind the fourteen-day window.
+        # Two months on, 2026-09-03 is behind the window.
         runner.refresh_calendars(config, store,
-                                 now=datetime(2026, 10, 3, 8, tzinfo=timezone.utc))
+                                 now=datetime(2026, 11, 3, 8, tzinfo=timezone.utc))
         assert stored(home)["events"] == []
 
     def test_a_paused_feed_does_not_keep_its_old_events(self, home, store, config, monkeypatch):

@@ -502,3 +502,101 @@ class TestTheFactOfTheDayIsNotShown:
         assert 'class="note' not in page
         # The title is allowed to wrap; it is not clipped in the markup.
         assert "overflow-wrap: break-word" in page
+
+
+CALENDARS = {"calendars": [{"label": "Kallee & Jake"}, {"label": "Family"}]}
+
+
+def on(day, title, calendar, time_="09:00", all_day=False):
+    return {**event(day, time_, title, all_day), "calendar": calendar}
+
+
+class TestCalendarColours:
+    """An event looks the same in the day, week and month views."""
+
+    def test_colours_follow_the_order_the_calendars_are_listed_in(self):
+        from dinkydash.board import calendar_colors
+        assert calendar_colors(CALENDARS) == {"Kallee & Jake": "blue", "Family": "green"}
+
+    def test_two_entries_sharing_a_label_share_a_colour(self):
+        from dinkydash.board import calendar_colors
+        both = {"calendars": [{"label": "A"}, {"label": "A"}, {"label": "B"}]}
+        assert calendar_colors(both) == {"A": "blue", "B": "green"}
+
+    def test_every_view_gives_an_event_the_same_colour(self):
+        events = [on("2026-09-03", "Dinner", "Family")]
+        view = build_view({**CONFIG, **CALENDARS}, payload("2026-09-03", events), TODAY)
+        assert view["events"][0]["color"] == "green"
+        assert view["week"]["days"][3]["events"][0]["color"] == "green"
+        thursday = [c for w in view["month"]["weeks"] for c in w if c["iso"] == "2026-09-03"][0]
+        assert thursday["events"][0]["color"] == "green"
+
+    def test_a_calendar_the_config_no_longer_lists_gets_the_first_colour(self):
+        events = [on("2026-09-03", "Old", "Deleted calendar")]
+        view = build_view({**CONFIG, **CALENDARS}, payload("2026-09-03", events), TODAY)
+        assert view["events"][0]["color"] == "blue"
+
+
+class TestWeekAndMonth:
+    def test_the_week_runs_monday_to_sunday_by_default(self):
+        view = build_view(CONFIG, payload("2026-09-03"), TODAY)  # a Thursday
+        days = view["week"]["days"]
+        assert [d["iso"] for d in days][0] == "2026-08-31"
+        assert [d["iso"] for d in days][-1] == "2026-09-06"
+        assert [d["is_today"] for d in days].count(True) == 1
+        assert view["week"]["title"] == "31 Aug – 6 Sep"
+
+    def test_the_week_can_start_on_sunday(self):
+        view = build_view({**CONFIG, "week_start": "sunday"}, payload("2026-09-03"), TODAY)
+        assert view["week"]["days"][0]["iso"] == "2026-08-30"
+
+    def test_the_month_is_whole_weeks_with_the_neighbouring_days_marked(self):
+        view = build_view(CONFIG, payload("2026-09-03"), TODAY)
+        cells = [c for week in view["month"]["weeks"] for c in week]
+        assert view["month"]["title"] == "September 2026"
+        assert len(cells) % 7 == 0
+        assert cells[0]["iso"] == "2026-08-31" and not cells[0]["in_month"]
+        assert sum(c["in_month"] for c in cells) == 30
+
+    def test_a_crowded_day_says_how_many_more(self):
+        events = [on("2026-09-03", f"Thing {i}", "Family", f"{8 + i:02d}:00") for i in range(5)]
+        view = build_view(CONFIG, payload("2026-09-03", events), TODAY)
+        cell = [c for w in view["month"]["weeks"] for c in w if c["iso"] == "2026-09-03"][0]
+        assert len(cell["events"]) == 3 and cell["more"] == 2
+
+    def test_events_from_before_today_reach_the_month(self):
+        events = [on("2026-09-01", "Earlier this week", "Family")]
+        view = build_view(CONFIG, payload("2026-09-03", events), TODAY)
+        cell = [c for w in view["month"]["weeks"] for c in w if c["iso"] == "2026-09-01"][0]
+        assert [e["title"] for e in cell["events"]] == ["Earlier this week"]
+
+
+class TestTheSidebarOnTheDashboard:
+    def page(self, tmp_path, monkeypatch):
+        from dinkydash import config as config_module
+        from dinkydash.store import FileStore
+        from tests.conftest import client_for
+        from web import create_app
+
+        path = tmp_path / "config.yaml"
+        path.write_text('family_name: "The Wilsons"\ntimezone: "Europe/Berlin"\n'
+                        'calendars:\n  - label: "Family"\n    url: "https://example.invalid/x.ics"\n')
+        (tmp_path / "dashboard_data.json").write_text(json.dumps(payload(
+            "2026-09-03", [on("2026-09-03", "Dinner", "Family")])))
+        moment = datetime(2026, 9, 3, 10, tzinfo=tzinfo_for({"timezone": "Europe/Berlin"}))
+        monkeypatch.setattr(config_module, "now_for", lambda _: moment)
+        return client_for(create_app(FileStore(path))).get("/").get_data(as_text=True)
+
+    def test_all_three_views_and_the_theme_toggle_are_offered(self, tmp_path, monkeypatch):
+        page = self.page(tmp_path, monkeypatch)
+        for name in ("day", "week", "month"):
+            assert f'data-view-set="{name}"' in page
+        assert "data-theme-toggle" in page
+        assert 'class="view-week"' in page and 'class="view-month"' in page
+
+    def test_the_default_is_the_day_view_so_a_page_without_script_still_reads(self, tmp_path, monkeypatch):
+        assert 'data-view="day"' in self.page(tmp_path, monkeypatch)
+
+    def test_the_legend_names_each_calendar_with_its_colour(self, tmp_path, monkeypatch):
+        page = self.page(tmp_path, monkeypatch)
+        assert 'legend-item cal-blue' in page and "Family" in page

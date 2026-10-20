@@ -16,7 +16,7 @@ and nothing is wrong.
 
 from datetime import date, datetime, timedelta
 
-from .calendars import events_on
+from .calendars import events_on, feed_label
 from .clock import clock_of, format_time
 from .config import is_set_up
 from .context import build_countdowns, compute_chore_assignments
@@ -31,6 +31,16 @@ MAX_EVENTS = 5
 MAX_TOMORROW = 3
 MAX_COUNTDOWNS = 3
 
+# Chips per day in the month grid and per column in the week. Past it a day says
+# "+N more" rather than growing, because the grid has to fit the screen.
+MAX_MONTH_CELL = 3
+MAX_WEEK_DAY = 8
+
+# One colour per calendar, in the order the calendars are listed, so an event
+# looks the same in the day, week and month views. Names, not hex: the template
+# maps each to a pair of tokens per theme, the way avatar colours work.
+CALENDAR_COLORS = ("blue", "green", "purple", "pink", "teal", "amber", "orange")
+
 # Nothing pushes to the dashboard, so it reloads itself on a timer. Five minutes is
 # the ceiling — it is a panel on a wall, not a page anyone is watching — and
 # reloading faster than the calendars are fetched only shows the same thing
@@ -41,7 +51,26 @@ MAX_RELOAD_SECONDS = 300
 WAITING_RELOAD_SECONDS = 60
 
 
-def as_shown(events, clock):
+def calendar_colors(config):
+    """Label -> colour name, by the order the calendars are listed in.
+
+    Two entries sharing a label share a colour, because their events are filed
+    under that one label and cannot be told apart afterwards.
+    """
+    colors = {}
+    for entry in config.get("calendars") or []:
+        if isinstance(entry, dict):
+            colors.setdefault(feed_label(entry),
+                              CALENDAR_COLORS[len(colors) % len(CALENDAR_COLORS)])
+    return colors
+
+
+def color_of(colors, label):
+    """The colour for an event's calendar; one the config no longer lists gets the first."""
+    return colors.get(label) or CALENDAR_COLORS[0]
+
+
+def as_shown(events, clock, colors=None):
     """The same events, each time written the way this family reads it.
 
     Stored events carry `%H:%M` with the full ISO `start` beside it, so the
@@ -52,6 +81,8 @@ def as_shown(events, clock):
     """
     shown = []
     for event in events:
+        if colors is not None:
+            event = {**event, "color": color_of(colors, event.get("calendar"))}
         if event.get("all_day"):
             shown.append(event)
             continue
@@ -93,6 +124,60 @@ def brief_is_overdue(config, payload, stale_days, now):
     return brief_due(config, payload, now)
 
 
+def week_start_index(config):
+    """0 for a week that starts on Monday, 6 for Sunday (`date.weekday()`'s numbering)."""
+    return 6 if str(config.get("week_start", "")).lower() == "sunday" else 0
+
+
+def _span(first, last):
+    """"12 – 18 October", or "28 Sep – 4 Oct" when the week crosses a month."""
+    if first.month == last.month:
+        return f"{first.day} \u2013 {last.day} {last.strftime('%B')}"
+    return f"{first.day} {first.strftime('%b')} \u2013 {last.day} {last.strftime('%b')}"
+
+
+def _chips(fetched, day, clock, colors, limit):
+    """A day's events as the compact entries the week and month views draw."""
+    events = as_shown(events_on(fetched, day), clock, colors)
+    chips = [{k: e.get(k) for k in ("title", "time", "all_day", "location", "color", "calendar")}
+             for e in events]
+    return chips[:limit], max(0, len(chips) - limit)
+
+
+def build_week(fetched, today, clock, colors, first_day=0):
+    """Seven days from the start of the week that holds `today`."""
+    start = today - timedelta(days=(today.weekday() - first_day) % 7)
+    days = []
+    for offset in range(7):
+        day = start + timedelta(days=offset)
+        chips, more = _chips(fetched, day, clock, colors, MAX_WEEK_DAY)
+        days.append({
+            "iso": day.isoformat(), "weekday": day.strftime("%a"), "num": day.day,
+            "is_today": day == today, "events": chips, "more": more,
+        })
+    return {"title": _span(start, start + timedelta(days=6)), "days": days}
+
+
+def build_month(fetched, today, clock, colors, first_day=0):
+    """The month holding `today`, as whole weeks, with the days either side greyed."""
+    first = today.replace(day=1)
+    following = (first + timedelta(days=32)).replace(day=1)
+    grid_start = first - timedelta(days=(first.weekday() - first_day) % 7)
+    weeks, day = [], grid_start
+    while day < following:
+        row = []
+        for _ in range(7):
+            chips, more = _chips(fetched, day, clock, colors, MAX_MONTH_CELL)
+            row.append({
+                "iso": day.isoformat(), "num": day.day, "in_month": day.month == first.month,
+                "is_today": day == today, "events": chips, "more": more,
+            })
+            day += timedelta(days=1)
+        weeks.append(row)
+    names = [(grid_start + timedelta(days=i)).strftime("%a") for i in range(7)]
+    return {"title": first.strftime("%B %Y"), "weekdays": names, "weeks": weeks}
+
+
 def reload_seconds(config):
     """How long the dashboard waits before rendering itself again.
 
@@ -124,8 +209,13 @@ def build_view(config, payload, today, now=None):
     # while nothing is being written — see `schedule.brief_due`.
     set_up = is_set_up(config)
 
+    colors = calendar_colors(config)
     view = {
         "family_name": config.get("family_name", ""),
+        # Shown under the sidebar so a colour can be traced to its calendar.
+        "legend": [{"label": label, "color": color} for label, color in colors.items()],
+        "week": None,
+        "month": None,
         "theme": theme,
         # The times are already written for this family below; the template
         # still needs to know which clock, because "12:00 pm" is wider than
@@ -167,14 +257,17 @@ def build_view(config, payload, today, now=None):
     clock = view["clock"]
     # Rewritten before anything reads a time off them, so the computed headline
     # below is on the family's clock too.
-    events = as_shown(events_on(fetched, today)[:MAX_EVENTS], clock)
+    events = as_shown(events_on(fetched, today)[:MAX_EVENTS], clock, colors)
     view["events"] = events
     # The fetch reaches 14 days ahead, so tomorrow is in the payload even when
     # it is a day old. Slots are what today did not use, which is why a busy
     # day silently drops tomorrow rather than overflowing the panel.
     slots = min(MAX_TOMORROW, MAX_EVENTS - len(events))
     view["tomorrow"] = as_shown(
-        events_on(fetched, today + timedelta(days=1))[:slots], clock) if slots else []
+        events_on(fetched, today + timedelta(days=1))[:slots], clock, colors) if slots else []
+    first_day = week_start_index(config)
+    view["week"] = build_week(fetched, today, clock, colors, first_day)
+    view["month"] = build_month(fetched, today, clock, colors, first_day)
 
     stale = payload.get("generated_for_date") != today.isoformat()
     view["stale"] = stale

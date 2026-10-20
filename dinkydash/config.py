@@ -27,6 +27,8 @@ DEFAULTS = {
     "clock": DEFAULT_CLOCK,
     "location": "",
     "theme": "light",
+    # Which day the week and month views start on: monday or sunday.
+    "week_start": "monday",
     "calendars": [],
     "people": [],
     "pets": [],
