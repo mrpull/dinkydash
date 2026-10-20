@@ -225,6 +225,10 @@
         /* Which view shows is data-view on <html>, which a refresh keeps. */
         .view-week, .view-month { display: none; }
         [data-view]:not([data-view="day"]) .day-only { display: none; }
+        /* The week and month views give their height to the days: no family name or date
+           row above the title, and slim margins round the cards. */
+        [data-view="week5"] .head, [data-view="week"] .head, [data-view="month"] .head { display: none; }
+        [data-view="week5"] .board, [data-view="week"] .board, [data-view="month"] .board { padding: 0.9rem 0.7rem 0.6rem; }
         [data-view="week"] .view-week[data-panel="week"], [data-view="week5"] .view-week[data-panel="week5"],
         [data-view="month"] .view-month {
             display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0;
