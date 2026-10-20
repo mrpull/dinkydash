@@ -17,8 +17,24 @@
     </div>
 </div>
 {% endmacro -%}
-{% macro chip(event) %}
-<div class="chip cal-{{ event.color }}{{ ' all-day' if event.all_day }}" title="{{ event.calendar }}"><span class="chip-time">{% if not event.all_day %}{{ event.time }}{% endif %}</span> {{ event.title }}</div>
+{% macro chip(event, times=true) %}
+<div class="chip cal-{{ event.color }}{{ ' all-day' if event.all_day }}" title="{{ event.calendar }}">{% if times and not event.all_day %}<span class="chip-time">{{ event.time }}</span> {% endif %}{{ event.title }}</div>
+{% endmacro -%}
+{% macro week_panel(week, name, label) %}
+<section class="view-week" data-panel="{{ name }}" aria-label="{{ label }}">
+    <div class="view-title">{{ week.title }}</div>
+    <div class="week" style="--cols: {{ week.days|length }}">
+        {% for day in week.days %}
+        <div class="week-day{{ ' today' if day.is_today }}">
+            <div class="week-day-head"><span class="wd-name">{{ day.weekday }}</span><span class="wd-num">{{ day.num }}</span></div>
+            <div class="week-events">
+                {% for e in day.events %}{{ chip(e) }}{% endfor %}
+                {% if day.more %}<div class="more-chip">+{{ day.more }} more</div>{% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
 {% endmacro -%}
 {# One colour per calendar, shared by every view: name -> light bar, light rgb,
    light text, dark bar, dark rgb, dark text. #}
@@ -65,7 +81,7 @@
         try {
             var r = document.documentElement;
             var v = localStorage.getItem("dd-view"), t = localStorage.getItem("dd-theme");
-            if (v === "day" || v === "week" || v === "month") { r.setAttribute("data-view", v); }
+            if (v === "day" || v === "week" || v === "week5" || v === "month") { r.setAttribute("data-view", v); }
             if (t === "light" || t === "dark") { r.setAttribute("data-theme", t); }
         } catch (e) {}
     })();
@@ -208,8 +224,9 @@
 
         /* Which view shows is data-view on <html>, which a refresh keeps. */
         .view-week, .view-month { display: none; }
-        [data-view="week"] .day-only, [data-view="month"] .day-only { display: none; }
-        [data-view="week"] .view-week, [data-view="month"] .view-month {
+        [data-view]:not([data-view="day"]) .day-only { display: none; }
+        [data-view="week"] .view-week[data-panel="week"], [data-view="week5"] .view-week[data-panel="week5"],
+        [data-view="month"] .view-month {
             display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0;
         }
         .view-title { font-size: 1.9rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 0.7rem; flex-shrink: 0; }
@@ -236,7 +253,7 @@
         .chip-time:empty { display: none; }
         .more-chip { font-size: 0.75rem; font-size: max(0.75rem, 11px); font-weight: 800; color: var(--text-muted); padding-left: 0.4rem; flex-shrink: 0; }
 
-        .week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-gap: 0.5rem; flex: 1 1 auto; min-height: 0; }
+        .week { display: grid; grid-template-columns: repeat(var(--cols, 7), minmax(0, 1fr)); grid-gap: 0.5rem; flex: 1 1 auto; min-height: 0; }
         .week-day { background: var(--box); border-radius: 0.8rem; padding: 0.55rem; display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
         .week-day.today { outline: 2px solid var(--accent); }
         .week-day-head { display: flex; align-items: baseline; margin-bottom: 0.45rem; flex-shrink: 0; }
@@ -263,7 +280,7 @@
         .nav-btn { appearance: none; border: 0; background: transparent; color: var(--text-muted); font: inherit; font-weight: 800; font-size: 0.78rem; font-size: max(0.78rem, 11px); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.55rem 0.7rem; border-radius: 0.8rem; cursor: pointer; min-width: 4.2rem; }
         .nav-btn svg { width: 1.5rem; height: 1.5rem; margin-bottom: 0.2rem; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
         .nav-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-        [data-view="day"] [data-view-set="day"], [data-view="week"] [data-view-set="week"], [data-view="month"] [data-view-set="month"] { background: var(--accent); color: var(--bg); }
+        [data-view="day"] [data-view-set="day"], [data-view="week"] [data-view-set="week"], [data-view="week5"] [data-view-set="week5"], [data-view="month"] [data-view-set="month"] { background: var(--accent); color: var(--bg); }
         .nav-spacer { flex: 1 1 auto; }
         .theme-btn .moon { display: none; }
         [data-theme="dark"] .theme-btn .sun { display: none; }
@@ -618,8 +635,11 @@
     <button type="button" class="nav-btn" data-view-set="day" aria-label="Day">
         <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2.5"></rect><path d="M4 10h16M9 3v4M15 3v4"></path><circle cx="12" cy="15" r="1.4"></circle></svg>Day
     </button>
-    <button type="button" class="nav-btn" data-view-set="week" aria-label="Week">
-        <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2.5"></rect><path d="M4 10h16M9 3v4M15 3v4M8.5 14h7"></path></svg>Week
+    <button type="button" class="nav-btn" data-view-set="week5" aria-label="Five-day week">
+        <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2.5"></rect><path d="M4 10h16M9 3v4M15 3v4M8.5 14h7"></path></svg>5 Day
+    </button>
+    <button type="button" class="nav-btn" data-view-set="week" aria-label="Seven-day week">
+        <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2.5"></rect><path d="M4 10h16M9 3v4M15 3v4M7.5 14h9M7.5 17h9"></path></svg>7 Day
     </button>
     <button type="button" class="nav-btn" data-view-set="month" aria-label="Month">
         <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2.5"></rect><path d="M4 10h16M9 3v4M15 3v4M9 14h.01M12 14h.01M15 14h.01M9 17h.01M12 17h.01"></path></svg>Month
@@ -704,22 +724,8 @@
         </div>
     </div>
 
-    {% if view.week %}
-    <section class="view-week" aria-label="Week">
-        <div class="view-title">{{ view.week.title }}</div>
-        <div class="week">
-            {% for day in view.week.days %}
-            <div class="week-day{{ ' today' if day.is_today }}">
-                <div class="week-day-head"><span class="wd-name">{{ day.weekday }}</span><span class="wd-num">{{ day.num }}</span></div>
-                <div class="week-events">
-                    {% for e in day.events %}{{ chip(e) }}{% endfor %}
-                    {% if day.more %}<div class="more-chip">+{{ day.more }} more</div>{% endif %}
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-    </section>
-    {% endif %}
+    {% if view.week %}{{ week_panel(view.week, "week", "Week") }}{% endif %}
+    {% if view.week5 %}{{ week_panel(view.week5, "week5", "Work week") }}{% endif %}
 
     {% if view.month %}
     <section class="view-month" aria-label="Month">
@@ -729,7 +735,7 @@
             {% for week in view.month.weeks %}{% for cell in week %}
             <div class="month-cell{{ ' today' if cell.is_today }}{{ '' if cell.in_month else ' outside' }}">
                 <div class="month-num">{{ cell.num }}</div>
-                {% for e in cell.events %}{{ chip(e) }}{% endfor %}
+                {% for e in cell.events %}{{ chip(e, false) }}{% endfor %}
                 {% if cell.more %}<div class="more-chip">+{{ cell.more }} more</div>{% endif %}
             </div>
             {% endfor %}{% endfor %}
@@ -841,9 +847,45 @@
     // Wrapped text makes height non-monotonic in the type size, so the search
     // below can settle on a size that overflows. Checked after it, and stepped
     // down until the day fits or the floor is reached.
+    // A day's cell holds as many chips as its height allows, and the rest are
+    // counted on a "+N more" line. The server sends more chips than any screen
+    // shows; how many fit depends on the screen, so it is measured here.
+    function fitCells() {
+        var cells = document.querySelectorAll(".month-cell, .week-day");
+        for (var i = 0; i < cells.length; i++) {
+            var cell = cells[i];
+            if (!cell.clientHeight) { continue; }          // the panel that is not showing
+            var chips = cell.querySelectorAll(".chip");
+            if (!chips.length) { continue; }
+            var more = cell.querySelector(".more-chip");
+            if (cell.getAttribute("data-extra") === null) {
+                var n = more ? parseInt(more.textContent.replace(/\D/g, ""), 10) : 0;
+                cell.setAttribute("data-extra", String(n || 0));
+            }
+            var total = chips.length + parseInt(cell.getAttribute("data-extra"), 10);
+            if (!more) {
+                more = document.createElement("div");
+                more.className = "more-chip";
+                chips[0].parentNode.appendChild(more);
+            }
+            var shown = chips.length;
+            for (var j = 0; j < chips.length; j++) { chips[j].style.display = ""; }
+            function say() {
+                more.textContent = "+" + (total - shown) + " more";
+                more.style.display = total > shown ? "" : "none";
+            }
+            say();
+            while (shown > 1 && cell.scrollHeight > cell.clientHeight + 1) {
+                shown--;
+                chips[shown].style.display = "none";
+                say();
+            }
+        }
+    }
+
     function fit() {
         fitOnce();
-        if (root.getAttribute("data-view") !== "day") { return; }
+        if (root.getAttribute("data-view") !== "day") { fitCells(); return; }
         if (window.visualViewport && window.visualViewport.scale > 1) { return; }
         var room = window.innerHeight, size = parseFloat(root.style.fontSize);
         for (var i = 0; i < 24 && size > 11 && naturalHeight() > room; i++) {

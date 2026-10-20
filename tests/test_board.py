@@ -560,10 +560,10 @@ class TestWeekAndMonth:
         assert sum(c["in_month"] for c in cells) == 30
 
     def test_a_crowded_day_says_how_many_more(self):
-        events = [on("2026-09-03", f"Thing {i}", "Family", f"{8 + i:02d}:00") for i in range(5)]
+        events = [on("2026-09-03", f"Thing {i}", "Family", f"{8 + i:02d}:00") for i in range(8)]
         view = build_view(CONFIG, payload("2026-09-03", events), TODAY)
         cell = [c for w in view["month"]["weeks"] for c in w if c["iso"] == "2026-09-03"][0]
-        assert len(cell["events"]) == 3 and cell["more"] == 2
+        assert len(cell["events"]) == 5 and cell["more"] == 3
 
     def test_events_from_before_today_reach_the_month(self):
         events = [on("2026-09-01", "Earlier this week", "Family")]
@@ -601,3 +601,39 @@ class TestTheSidebarOnTheDashboard:
     def test_the_legend_names_each_calendar_with_its_colour(self, tmp_path, monkeypatch):
         page = self.page(tmp_path, monkeypatch)
         assert 'legend-item cal-blue' in page and "Family" in page
+
+
+class TestFiveDayWeek:
+    def test_it_is_monday_to_friday(self):
+        view = build_view(CONFIG, payload("2026-09-03"), TODAY)  # a Thursday
+        days = view["week5"]["days"]
+        assert [d["iso"] for d in days] == ["2026-08-31", "2026-09-01", "2026-09-02",
+                                            "2026-09-03", "2026-09-04"]
+        assert view["week5"]["title"] == "31 Aug – 4 Sep"
+        assert view["week"]["days"][-1]["iso"] == "2026-09-06"  # the 7-day week is untouched
+
+    def test_a_sunday_start_still_gives_monday_to_friday(self):
+        view = build_view({**CONFIG, "week_start": "sunday"}, payload("2026-09-03"), TODAY)
+        assert [d["weekday"] for d in view["week5"]["days"]] == ["Mon", "Tue", "Wed", "Thu", "Fri"]
+
+    def test_events_carry_the_same_colour_as_the_seven_day_week(self):
+        events = [on("2026-09-03", "Dinner", "Family")]
+        view = build_view({**CONFIG, **CALENDARS}, payload("2026-09-03", events), TODAY)
+        assert view["week5"]["days"][3]["events"][0]["color"] == "green"
+
+
+class TestMonthChipsHaveNoTimes:
+    def page(self, tmp_path, monkeypatch):
+        return TestTheSidebarOnTheDashboard().page(tmp_path, monkeypatch)
+
+    def test_the_month_shows_titles_only_and_the_week_keeps_times(self, tmp_path, monkeypatch):
+        page = self.page(tmp_path, monkeypatch)
+        month = page[page.index('class="view-month"'):]
+        week = page[page.index('data-panel="week"'):page.index('class="view-month"')]
+        assert "Dinner" in month and 'class="chip-time"' not in month
+        assert 'class="chip-time"' in week
+
+    def test_both_week_views_are_offered(self, tmp_path, monkeypatch):
+        page = self.page(tmp_path, monkeypatch)
+        assert 'data-view-set="week5"' in page and 'data-view-set="week"' in page
+        assert 'data-panel="week5"' in page

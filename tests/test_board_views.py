@@ -78,7 +78,8 @@ class TestMonth:
         events = [event("2026-10-20", f"Thing {i}") for i in range(MAX_MONTH_CELL + 2)]
         month = build_month(events, date(2026, 10, 20), "24h", {})
         today = next(c for w in month["weeks"] for c in w if c["is_today"])
-        assert len(today["events"]) == MAX_MONTH_CELL and today["more"] == 2
+        # "+N more" takes the last line, so it counts the event that line displaced.
+        assert len(today["events"]) == MAX_MONTH_CELL - 1 and today["more"] == 3
 
     def test_times_follow_the_families_clock(self):
         events = [event("2026-10-20", "Dinner", time_="17:45")]

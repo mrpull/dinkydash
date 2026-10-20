@@ -31,9 +31,11 @@ MAX_EVENTS = 5
 MAX_TOMORROW = 3
 MAX_COUNTDOWNS = 3
 
-# Chips per day in the month grid and per column in the week. Past it a day says
-# "+N more" rather than growing, because the grid has to fit the screen.
-MAX_MONTH_CELL = 3
+# Lines per day in the month grid and per column in the week. A day with more
+# events than that spends its last line on "+N more" rather than growing. These
+# are ceilings, not what shows: the page hides further chips until each cell
+# fits the screen it is on (`fitCells` in board.html).
+MAX_MONTH_CELL = 6
 MAX_WEEK_DAY = 8
 
 # One colour per calendar, in the order the calendars are listed, so an event
@@ -141,21 +143,27 @@ def _chips(fetched, day, clock, colors, limit):
     events = as_shown(events_on(fetched, day), clock, colors)
     chips = [{k: e.get(k) for k in ("title", "time", "all_day", "location", "color", "calendar")}
              for e in events]
-    return chips[:limit], max(0, len(chips) - limit)
+    if len(chips) <= limit:
+        return chips, 0
+    # "+N more" takes the last slot, so the count is always on screen instead of
+    # being clipped below the chips.
+    return chips[:limit - 1], len(chips) - (limit - 1)
 
 
-def build_week(fetched, today, clock, colors, first_day=0):
-    """Seven days from the start of the week that holds `today`."""
+def build_week(fetched, today, clock, colors, first_day=0, length=7):
+    """Seven days from the start of the week that holds `today`, or five (Monday to Friday)."""
     start = today - timedelta(days=(today.weekday() - first_day) % 7)
+    if length == 5:
+        start += timedelta(days=(0 - start.weekday()) % 7)  # a Sunday start skips to Monday
     days = []
-    for offset in range(7):
+    for offset in range(length):
         day = start + timedelta(days=offset)
         chips, more = _chips(fetched, day, clock, colors, MAX_WEEK_DAY)
         days.append({
             "iso": day.isoformat(), "weekday": day.strftime("%a"), "num": day.day,
             "is_today": day == today, "events": chips, "more": more,
         })
-    return {"title": _span(start, start + timedelta(days=6)), "days": days}
+    return {"title": _span(start, start + timedelta(days=length - 1)), "days": days}
 
 
 def build_month(fetched, today, clock, colors, first_day=0):
@@ -215,6 +223,7 @@ def build_view(config, payload, today, now=None):
         # Shown under the sidebar so a colour can be traced to its calendar.
         "legend": [{"label": label, "color": color} for label, color in colors.items()],
         "week": None,
+        "week5": None,
         "month": None,
         "theme": theme,
         # The times are already written for this family below; the template
@@ -267,6 +276,7 @@ def build_view(config, payload, today, now=None):
         events_on(fetched, today + timedelta(days=1))[:slots], clock, colors) if slots else []
     first_day = week_start_index(config)
     view["week"] = build_week(fetched, today, clock, colors, first_day)
+    view["week5"] = build_week(fetched, today, clock, colors, first_day, length=5)
     view["month"] = build_month(fetched, today, clock, colors, first_day)
 
     stale = payload.get("generated_for_date") != today.isoformat()
