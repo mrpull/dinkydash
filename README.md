@@ -8,11 +8,11 @@ The digital family calendar for screens you already own — a TV, an old tablet,
 
 Website: [dinkydash.co](https://dinkydash.co)
 
-DinkyDash merges your calendars into one agenda, works out whose turn each chore is, counts down to the next birthday, and once a day asks Claude for a headline. Then it puts the lot on a screen at home — light or dark, sized to read from across the kitchen.
+DinkyDash merges your calendars into one agenda, works out whose turn each chore is, and counts down to the next birthday. Then it puts the lot on a screen at home — light or dark, sized to read from across the kitchen. A sidebar switches between today, a week, four weeks and the whole month.
 
 ## Two ways to run it
 
-**Self-hosted (this repo).** Free, MIT-licensed, runs on your own hardware with your own Anthropic API key. Setup takes an afternoon and some comfort with a terminal.
+**Self-hosted (this repo).** Free, MIT-licensed, runs on your own hardware. If you want the daily headline it uses your own Anthropic API key; with `ai_headline: false` it needs none. Setup takes an afternoon and some comfort with a terminal.
 
 > Self-hosting is **community-supported**. Issues and pull requests are welcome, but there's no support commitment — if you need it to just work, use the hosted version.
 
@@ -27,27 +27,53 @@ DinkyDash merges your calendars into one agenda, works out whose turn each chore
 - A look at tomorrow underneath it, on the days today leaves room
 - Whose turn each chore is — it moves on with the date, nothing to tick off
 - Countdowns to birthdays, holidays and special dates
-- An AI-written headline, tied to the day
-- Light or dark, chosen in the settings UI
+- Five views, from today to the whole month, each calendar in its own colour
+- Light or dark, flipped from the sidebar or set in the settings UI
 
 Configure all of it from your phone at `/settings`, or by editing `config.yaml` directly — they are
 the same file, and the UI keeps your comments.
+
+### Views and the sidebar
+
+The sidebar on the left (along the top of a phone or a portrait screen) switches the view:
+
+- **Day** — today's agenda, whose turn each chore is, and what's coming up.
+- **5 Day** — Monday to Friday of this week, a card for each day.
+- **7 Day** — the whole week, a card for each day.
+- **4 Weeks** — this week as the top row, then the next three weeks. It's the one for seeing what's coming.
+- **Month** — the calendar month, with the days either side greyed out.
+
+A few things worth knowing:
+
+- **Each calendar gets its own colour**, by the order you list them in `config.yaml`, and an event keeps it in every view. On wide screens the sidebar names which colour is which.
+- **Start times show in the week views.** The month and 4 Weeks views show titles only, so a full grid stays readable. A day with more events than fit says "+3 more".
+- **Tap or click a day** in any view except Day to open the whole day in a card, with times and locations. It closes with the ✕, Esc or a tap outside, and on its own after a minute, so a wall screen is never left covered.
+- **The Theme button** flips light and dark. The view and the theme you pick are remembered by that screen's browser, so a kitchen panel and a phone can differ. Until you pick, the `theme` in `config.yaml` decides.
+- **Weeks start on Monday.** Set `week_start: sunday` in `config.yaml` to change it. The 5 Day view is always Monday to Friday.
+
+### The daily headline
+
+Once a day, at a time you set, DinkyDash can ask Claude to write a headline for the day, and it keeps it with the dashboard. The dashboard doesn't show it at the moment. If you'd rather not spend anything on it, set `ai_headline: false` in `config.yaml`: nothing calls the model at all, and the calendars still refresh. The settings page hides its two "write a daily message" buttons when it's off.
 
 ## How it works
 
 ```
 [cron every 5m] → generate.py --tick → every hour: re-fetches every iCal feed, in time order
                                      → once a day at a time you set, 06:00 by default
-                                       (and at once on the first run): calls Claude
+                                       (and at once on the first run): calls Claude,
+                                       unless ai_headline is false
                                      → saves dashboard_data.json
 
 [browser]       → web/routes/board.py → recomputes chores, countdowns and today's agenda
                                       → renders the dashboard
 ```
 
-Only the headline comes from the model. Ages, countdowns, chore turns and the
-agenda are recomputed on every render, so if a day's run fails the times and turns on the wall
-are still today's — the headline is one worked out from the day, and the dashboard says so.
+Only the headline comes from the model. Ages, countdowns, chore turns and every agenda in
+every view are recomputed on every render, so if a day's run fails the times and turns on the
+wall are still today's.
+
+The calendars are fetched from 37 days back to at least 45 days ahead, so the month and
+4 Weeks views always have their whole grid.
 
 ---
 
@@ -70,8 +96,9 @@ python app.py
 - http://localhost:5000/preview — Pi, TV and tablet sizes side by side
 
 The chore turns, ages and countdowns are computed from the `config.yaml` you just made, so
-editing it and reloading shows your own family. Only the headline is canned until
-you add an Anthropic API key.
+editing it and reloading shows your own family. You only need an Anthropic API key for the
+daily headline, which the dashboard doesn't show at the moment. Set `ai_headline: false` to run
+without one.
 
 **Then follow the [getting started guide](https://dinkydash.co/getting-started/)** — it has
 the API key step, where to find your calendar's iCal link for Google, iCloud and Outlook, and
@@ -143,12 +170,12 @@ versions CI passed on. A pull request that fails either check shows a red X.
 | `dinkydash/store.py` | Where the config, the dashboard and the note history are kept |
 | `migrations/` | The hosted schema, plain SQL. Self-hosting needs none of it |
 | `web/` | Flask app — dashboard, settings UI, templates |
-| `web/templates/board.html` | The dashboard itself, light and dark, all screen sizes |
+| `web/templates/board.html` | The dashboard itself: the sidebar, the five views and the day card, light and dark, all screen sizes |
 | `generate.py` | Command-line skin over `dinkydash.runner` — this is what cron calls |
 | `app.py` | Flask entry point |
 | `config.yaml` | All configuration. The settings UI writes this same file |
 | `config.example.yaml` | Template config, documenting every key |
-| `tests/` | 368 tests. Run them before committing |
+| `tests/` | Over 1,700 tests; the ones that need Postgres skip without it. Run them before committing |
 | `doc/` | Running it day to day, and upgrading from an older version |
 | `design/` | Mockups for the dashboard and settings UI, with the reasoning |
 | `.env` | `ANTHROPIC_API_KEY` (not in git) |
