@@ -4,7 +4,7 @@
 
 The digital family calendar for screens you already own — a TV, an old tablet, or a Raspberry Pi.
 
-![The DinkyDash dashboard: today's agenda, whose turn each chore is, and the countdowns](screenshot.png)
+![The DinkyDash dashboard: today's agenda, whose turn each chore is, and the countdowns](doc/screenshots/day.png)
 
 Website: [dinkydash.co](https://dinkydash.co)
 
@@ -50,6 +50,39 @@ A few things worth knowing:
 - **Tap or click a day** in any view except Day to open the whole day in a card, with times and locations. It closes with the ✕, Esc or a tap outside, and on its own after a minute, so a wall screen is never left covered.
 - **The Theme button** flips light and dark. The view and the theme you pick are remembered by that screen's browser, so a kitchen panel and a phone can differ. Until you pick, the `theme` in `config.yaml` decides.
 - **Weeks start on Monday.** Set `week_start: sunday` in `config.yaml` to change it. The 5 Day view is always Monday to Friday.
+
+### The views
+
+Every screenshot here is invented: a made-up family with two sample calendars that hold nothing
+but public holidays.
+
+**Day** — today, tomorrow underneath, and the chores and countdowns beside it.
+
+![Day view: Christmas Eve and Las Posadas on today's agenda, Christmas Day tomorrow, whose turn each chore is, and the countdowns](doc/screenshots/day.png)
+
+**5 Day** — Monday to Friday, a card for each day.
+
+![5 Day view: Monday 21 to Friday 25 December, with today outlined](doc/screenshots/5-day.png)
+
+**7 Day** — the whole week.
+
+![7 Day view: the week of 21 to 27 December, holidays in two colours](doc/screenshots/7-day.png)
+
+**4 Weeks** — this week as the top row, then the next three.
+
+![4 Weeks view: 21 December to 17 January, with "Jan 1" marking where the new month starts](doc/screenshots/4-weeks.png)
+
+**Month** — the calendar month, titles only.
+
+![Month view: December 2026, each holiday on its day](doc/screenshots/month.png)
+
+**Dark** — the same views with the Theme button flipped.
+
+![Month view in dark mode](doc/screenshots/month-dark.png)
+
+**A day, in full** — tap or click any day outside the Day view.
+
+![The day card for Saturday 26 December, listing Kwanzaa begins and Boxing Day over the dimmed 7 Day view](doc/screenshots/day-card.png)
 
 ### The daily headline
 
