@@ -373,7 +373,7 @@ class TestTheWayBackFromTheBoard:
     from a settings page saved to a phone's home screen — no address bar, and
     on an iPhone no Back button — it was a dead end, and the way out was to
     force-quit the app. So it opens in its own tab, which every client knows
-    how to leave, and nothing has to be drawn on the dashboard itself."""
+    how to leave. The dashboard's Settings link does the same in the other direction."""
 
     @pytest.fixture
     def written(self, tmp_path, config_path):
@@ -390,11 +390,16 @@ class TestTheWayBackFromTheBoard:
         for link in links:
             assert 'target="_blank"' in link and 'rel="noopener"' in link
 
-    def test_the_board_itself_has_no_way_back_to_draw(self, client, written):
-        """The panel is the same page. A link out on it would sit on the wall,
-        and hosted it would land a panel with no session on the login page."""
+    def test_the_boards_one_link_out_is_settings_in_its_own_tab(self, client, written):
+        """A self-hosted dashboard has a Settings link in the sidebar. It opens
+        in its own tab, so a panel that follows it is never left on a page that
+        does not reload; a hosted screen has no session to go there with and is
+        handed no link (`tests/test_cloud_mode.py`)."""
         board = client.get("/").get_data(as_text=True)
-        assert "/settings" not in board
+        links = re.findall(r"<a [^>]*>", board)
+        assert len(links) == 1, links
+        assert 'href="/settings/"' in links[0]
+        assert 'target="_blank"' in links[0] and 'rel="noopener"' in links[0]
 
     def test_a_self_hoster_gets_no_screen_link_button(self, client, written):
         """Their dashboard is at / on the host they are already on, and the

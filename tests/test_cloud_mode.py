@@ -249,8 +249,10 @@ class TestABoardOutOfPostgres:
         leaked below the storage layer — which is the thing CLAUDE.md's "every
         change must work in both" exists to prevent.
 
-        **One line is allowed to differ, and exactly one**: the `<link
-        rel=manifest>`. A wall panel reaches its manifest at
+        **Two things are allowed to differ, and only two.** The first is the Settings
+        link in the sidebar: a self-hosted page is handed one, and a wall panel
+        has no session to reach settings with, so a hosted screen is handed none.
+        The second is the `<link rel=manifest>`. A wall panel reaches its manifest at
         `/s/<token>/manifest.webmanifest`, because the signed-in one is behind
         the session and would hand a tablet a redirect to `/login` instead of a
         name and an icon (DIN-42). Normalising that href rather than dropping
@@ -275,8 +277,16 @@ class TestABoardOutOfPostgres:
         from_rows = client.get(board_path(pg_pool, pg_family)).get_data(as_text=True)
 
         manifest = re.compile(r'<link rel="manifest" href="[^"]+">')
+        settings = re.compile(r'\s*<a class="nav-btn" href="[^"]+" target="_blank" rel="noopener" '
+                              r'aria-label="Settings">.*?</a>', re.S)
         assert manifest.search(from_file) and manifest.search(from_rows)
-        assert manifest.sub("[manifest]", from_rows) == manifest.sub("[manifest]", from_file)
+        assert settings.search(from_file) and not settings.search(from_rows)
+
+        def same(page):
+            # Whitespace is folded: the block's own newlines stay when it is left out.
+            return re.sub(r"\s+", " ", settings.sub("", manifest.sub("[manifest]", page)))
+
+        assert same(from_rows) == same(from_file)
 
 
 class TestWhichModelRunsIsNotAHostedSetting:

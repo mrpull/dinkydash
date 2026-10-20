@@ -303,8 +303,10 @@ def build_view(config, payload, today, now=None):
         "timezone": config.get("timezone") or "UTC",
     }
 
-    if not payload:
-        return view
+    # A family that is set up always sees its dashboard, with whatever has been
+    # stored: a stale agenda, or an empty one before the first fetch, beats a
+    # screen that shows nothing. Only the starter household waits.
+    payload = payload or {}
     if not set_up and not payload.get("generated_for_date"):
         # The calendars have been fetched but the family is still setting up.
         # An agenda under an amber "today's note hasn't arrived" banner
@@ -313,7 +315,8 @@ def build_view(config, payload, today, now=None):
         # says what is actually going on.
         return view
 
-    view["reload_seconds"] = reload_seconds(config)
+    # With nothing stored yet, look again in a minute rather than five.
+    view["reload_seconds"] = reload_seconds(config) if payload else WAITING_RELOAD_SECONDS
 
     fetched = payload.get("events") or []
     clock = view["clock"]

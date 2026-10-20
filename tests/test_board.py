@@ -245,9 +245,9 @@ class TestTomorrow:
 
 
 class TestEmptyStates:
-    def test_no_payload_at_all_is_the_waiting_screen(self):
+    def test_no_payload_at_all_still_shows_the_dashboard(self):
         view = build_view(CONFIG, None, TODAY)
-        assert view["state"] == "waiting"
+        assert view["state"] == "stale"
         assert view["events"] == []
         assert view["tomorrow"] == []
         # Chores and countdowns still work — they never needed the model.
@@ -292,10 +292,11 @@ class TestStillSettingUp:
         assert view["state"] == "waiting"
         assert view["set_up"] is False
 
-    def test_a_set_up_family_with_no_payload_is_waiting_for_the_first_board(self):
+    def test_a_set_up_family_with_no_payload_sees_its_dashboard_not_a_waiting_screen(self):
         view = build_view(CONFIG, None, TODAY)
-        assert view["state"] == "waiting"
+        assert view["state"] != "waiting"
         assert view["set_up"] is True
+        assert view["reload_seconds"] == 60  # nothing stored yet: look again soon
 
     def test_an_agenda_with_no_brief_is_still_the_waiting_screen(self):
         # The calendars have been fetched — that half is free and runs
@@ -360,15 +361,13 @@ class TestReloadInterval:
         assert build_view(config, payload("2026-09-03"), TODAY)["reload_seconds"] == 300
 
 
-class TestTheWaitingScreen:
-    """What a family reads before their first dashboard arrives.
+class TestAFamilyThatIsSetUpAlwaysSeesItsDashboard:
+    """Nothing stored yet is a dashboard with an empty agenda, not a screen that says wait.
 
-    `board.html` is rendered from the same file in both modes and
-    `tests/test_cloud_mode.py` asserts the two are byte-identical, so anything
-    written here has to be true of a Raspberry Pi *and* of a wall panel in a
-    kitchen. It used to say "Run `python generate.py`", which was a Pi's
-    instruction on a hosted family's screen and, since DIN-45, the wrong advice
-    on the Pi too — the next tick writes it either way.
+    A stale or empty calendar is better on the wall than no calendar, so only the
+    starter household (below) is held back. `board.html` is rendered from the
+    same file in both modes, so this is true of a Raspberry Pi and of a screen in
+    a kitchen.
     """
 
     @pytest.fixture
@@ -382,15 +381,16 @@ class TestTheWaitingScreen:
         client = client_for(create_app(FileStore(path)))
         return client.get("/").get_data(as_text=True)
 
-    def test_it_is_the_waiting_screen(self, page):
-        assert "first dashboard" in page
+    def test_it_is_the_dashboard(self, page):
+        assert 'class="board"' in page and 'data-view-set="month"' in page
 
-    def test_it_names_no_command(self, page):
-        # A parent reading this has no shell, and after DIN-45 nobody needs one.
+    def test_it_says_nothing_about_waiting_or_writing(self, page):
+        for words in ("first dashboard", "Fetching", "Writing", "Nearly there"):
+            assert words not in page
+
+    def test_it_names_no_command_and_no_button(self, page):
         assert "generate.py" not in page
-
-    def test_it_names_the_button_the_settings_page_actually_has(self, page):
-        assert "Write first daily message" in page
+        assert "Write first daily message" not in page
 
     def test_a_family_still_setting_up_is_told_that_instead(self, tmp_path):
         # The example file's household is invented, so nothing is being
@@ -754,21 +754,17 @@ class TestFirstRunWithHeadlinesOff:
         from tests.conftest import client_for
         from web import create_app
 
+        tmp_path.mkdir(exist_ok=True)
         path = tmp_path / "config.yaml"
         path.write_text('family_name: "The Wilsons"\ntimezone: "Europe/Berlin"\n'
                         f'ai_headline: {flag}\n')
         return client_for(create_app(FileStore(path)))
 
-    def test_the_waiting_screen_says_the_calendars_are_coming_not_a_headline(self, tmp_path):
-        page = self.client(tmp_path).get("/").get_data(as_text=True)
-        assert "Fetching The Wilsons&#39;s calendars" in page or "calendars&hellip;" in page
-        assert "Refresh calendars" in page
-        assert "Write first daily message" not in page
-        assert "Writing" not in page
-
-    def test_with_headlines_on_it_still_says_it_is_writing(self, tmp_path):
-        page = self.client(tmp_path, "true").get("/").get_data(as_text=True)
-        assert "Writing" in page and "Write first daily message" in page
+    def test_the_dashboard_shows_with_nothing_stored_whatever_the_setting(self, tmp_path):
+        for flag in ("false", "true"):
+            page = self.client(tmp_path / flag, flag).get("/").get_data(as_text=True)
+            assert 'class="board"' in page
+            assert "Fetching" not in page and "Writing" not in page
 
     def test_the_settings_page_offers_a_refresh_rather_than_a_write_button(self, tmp_path):
         page = self.client(tmp_path).get("/settings/").get_data(as_text=True)

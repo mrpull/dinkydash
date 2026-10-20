@@ -68,17 +68,20 @@ def index():
     """
     if current_app.config["MODE"] == CLOUD:
         return redirect(url_for("settings.home"))
-    return render_board(current_store())
+    # The one place a settings link is drawn: there is a session-free page to
+    # leave from and nothing to sign in to on the other side.
+    return render_board(current_store(), settings_url=url_for("settings.home"))
 
 
-def render_board(store, manifest_url=None, access=None):
+def render_board(store, manifest_url=None, access=None, settings_url=None):
     """The dashboard page for whichever family that store is for.
 
     Shared with `web/routes/screen.py`, so the signed-in view and the wall
     panel render the same page from the same code. `manifest_url` is the only
     difference between them and it is one link in the head: the panel's
     manifest has to be reachable without a session, or "save to home screen"
-    gets a redirect to `/login` instead of a name and an icon.
+    gets a redirect to `/login` instead of a name and an icon. `settings_url`
+    puts a Settings link in the sidebar; only the self-hosted route passes one.
     Hosted callers also pass access state, so a lapsed panel cannot keep
     recomputing the day. Active cloud dashboards retain parity with single mode.
     """
@@ -92,7 +95,7 @@ def render_board(store, manifest_url=None, access=None):
         # separately could land the other side of midnight from it.
         now = config_module.now_for(config)
         view = board_view.build_view(config, payload, now.date(), now=now)
-    return render_template("board.html", view=view,
+    return render_template("board.html", view=view, settings_url=settings_url,
                            manifest_url=manifest_url or url_for("board.manifest"))
 
 

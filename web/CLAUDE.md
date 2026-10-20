@@ -302,12 +302,11 @@ single-column layout (an iPad in portrait) has no side column to hide behind and
 full price, around 13-18%. Everything fits at all three sizes in every case. Raising either
 constant spends more type size, so measure at `/preview` before you do.
 
-**The shared waiting screen must work in both modes.** Refer to the settings button, **Write the
-first dashboard**, rather than a shell command. Keep that label in sync with `settings/home.html` and
-see [Two cadences, one tick](../dinkydash/CLAUDE.md#two-cadences-one-tick) for when it is
-written. It has two wordings, chosen by `view.set_up`: "writing your first dashboard" when one
-is on its way, and "nearly there" while the family is still setting up and nothing is being
-written.
+**A family that is set up always sees its dashboard.** With nothing stored yet `build_view` renders
+an empty agenda under the chores and countdowns and looks again in a minute, because a stale or
+empty calendar on the wall beats a screen that says wait. The one waiting screen is "Nearly
+there", for the starter household and the untouched timezone (`config.is_set_up`): showing those
+turns as the family's would be wrong. It is shared by both modes, so it names no shell command.
 
 In two-column mode the body is a grid of agenda and side column, and both stretch to the
 height left under the headline. The breakpoint is `min-aspect-ratio: 5/4` and `min-width:
@@ -337,16 +336,22 @@ remembers a "Not now" in `localStorage`; it hides itself when already running fr
 Note that Chrome's own install prompt needs https, so on a home network it never fires and the
 written steps are what people see.
 
-**"View dashboard" opens the dashboard in its own tab, and so does the "Dashboard" link beside it.** The dashboard
-is the wall panel: full screen, no link out, and it reloads itself for years. Opened in the same tab
-from a settings page saved to a phone's home screen it was a dead end — a saved web app has no
-address bar and, on an iPhone, no Back button, so the way out was to force-quit the app; and in a
-Safari tab every self-reload adds a history entry, so Back needed one tap per reload spent looking.
-Its own tab is a way back the dashboard never has to draw: a tab to close, an in-app sheet with Done on
-iOS, a custom tab with an X on Android. **Do not answer this with a Settings control on the dashboard.**
-A tablet set up in the same tab would keep it on the wall, because the reload keeps the URL; and
-hosted, a tap on it from a panel with no session lands on `/login`, which has no reload timer, so
-the wall stays there. `tests/test_settings.py` asserts the tab and the dashboard's lack of a way back.
+**"View dashboard" opens the dashboard in its own tab, and so does the "Dashboard" link beside it —
+and the dashboard's Settings link opens settings in its own tab, for the same reason.** The dashboard
+is the wall panel: full screen, and it reloads itself for years. Opened in the same tab from a
+settings page saved to a phone's home screen it was a dead end — a saved web app has no address bar
+and, on an iPhone, no Back button, so the only way out was to force-quit the app; and in a Safari
+tab every self-reload adds a history entry, so Back needed one tap per reload spent looking. Its
+own tab is a way back the page never has to draw: a tab to close, an in-app sheet with Done on iOS,
+a custom tab with an X on Android. The same holds the other way: a panel that followed a link
+in place would be left on a settings page, which does not reload, because the reload keeps the URL.
+
+So the Settings link in the sidebar is **self-hosted only** and always `target="_blank"`.
+`render_board` takes a `settings_url`, and only the single-mode route passes one. A hosted screen is
+handed none, because it has no session: a tap would land on `/login`, which has no reload timer, and
+the wall would stay there. `tests/test_settings.py` asserts the tab and that it is the page's only
+link; `tests/test_cloud_mode.py` asserts that is the only way the two modes' pages differ besides the
+manifest.
 
 **Copy and Share beside the screen link are the browser's own** — `navigator.clipboard` and
 `navigator.share`, in `settings/_screen_link.html`. Nothing is fetched and nothing leaves the page

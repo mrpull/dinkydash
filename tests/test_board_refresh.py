@@ -27,17 +27,19 @@ from tests.conftest import client_for
 from web import create_app
 
 SET_UP = 'family_name: "The Wilsons"\ntimezone: "Europe/Berlin"\n'
+# The starter household: still on the default timezone, so nothing is shown yet.
+STARTER = 'family_name: "The Wilsons"\ntimezone: "UTC"\n'
 
 
-def page_for(directory, payload=None):
-    """A single-mode dashboard for a set-up family, with or without a board.
+def page_for(directory, payload=None, config=SET_UP):
+    """A single-mode dashboard, by default for a set-up family, with or without a board.
 
     Each caller gets its own directory: a test that asks for both pages must
     not have the waiting one find the ready one's `dashboard_data.json`.
     """
     directory.mkdir()
     path = directory / "config.yaml"
-    path.write_text(SET_UP)
+    path.write_text(config)
     if payload is not None:
         (directory / "dashboard_data.json").write_text(json.dumps(payload))
     return client_for(create_app(FileStore(path))).get("/").get_data(as_text=True)
@@ -57,7 +59,7 @@ def ready(tmp_path, today):
 
 @pytest.fixture
 def waiting(tmp_path):
-    return page_for(tmp_path / "waiting")
+    return page_for(tmp_path / "waiting", config=STARTER)
 
 
 def script_of(page):
@@ -120,13 +122,14 @@ class TestWhatTheBadgeCanSay:
 
     def test_a_waiting_screen_is_for_no_day_and_says_so(self, waiting):
         assert "data-today=" not in waiting
-        assert 'data-timezone="Europe/Berlin"' in waiting
+        assert 'data-timezone="UTC"' in waiting
 
     def test_the_badge_offers_no_way_out(self, ready):
-        """It sits on a wall, in a page that deliberately has no link out
-        (`tests/test_settings.py` asserts the same of the whole page)."""
-        assert "/settings" not in ready
-        assert "<a " not in ready
+        """It sits on a wall, so it is text only. The page's one link is the
+        sidebar's Settings, in its own tab (`tests/test_settings.py`)."""
+        assert '<div class="offline" role="status" hidden></div>' in ready
+        links = re.findall(r"<a [^>]*>", ready)
+        assert len(links) == 1 and 'href="/settings/"' in links[0]
 
 
 class TestADeployReachesTheWall:

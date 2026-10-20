@@ -308,6 +308,7 @@
         .side-nav > * + * { margin-left: 0.64em; }
         .nav-btn { appearance: none; border: 0; background: transparent; color: var(--text-muted); font: inherit; font-weight: 800; font-size: 0.78em; font-size: max(0.78em, 11px); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.705em 0.9em; border-radius: 1.025em; cursor: pointer; min-width: 5.385em; }
         .nav-btn svg { width: 1.923em; height: 1.923em; margin-bottom: 0.256em; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+        a.nav-btn { text-decoration: none; }
         .nav-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
         [data-view="day"] [data-view-set="day"], [data-view="week"] [data-view-set="week"], [data-view="week5"] [data-view-set="week5"], [data-view="month"] [data-view-set="month"], [data-view="rolling"] [data-view-set="rolling"] { background: var(--accent); color: var(--bg); }
         .nav-spacer { flex: 1 1 auto; }
@@ -654,32 +655,6 @@
     <div class="waiting-sub">Dashboard updates are paused. Open your settings on a phone or computer to manage your account.</div>
 </div>
 
-{% elif view.state == 'waiting' and view.set_up and not view.ai_headline %}
-{# Headlines are off, so the first thing to arrive is the calendars. #}
-<div class="waiting">
-    <div class="family">DinkyDash</div>
-    <div class="waiting-head">Fetching {{ view.family_name or "your" }}{{ "'s" if view.family_name else "" }} calendars&hellip;</div>
-    <div class="bar"><span></span></div>
-    <div class="waiting-sub">
-        The next refresh brings them in, usually within a few minutes, and this
-        page fills itself in. To fetch them now, open the settings page and press
-        &ldquo;Refresh calendars&rdquo;.
-    </div>
-</div>
-
-{% elif view.state == 'waiting' and view.set_up %}
-<div class="waiting">
-    <div class="family">DinkyDash</div>
-    <div class="waiting-head">Writing {{ view.family_name or "your" }}{{ "'s" if view.family_name else "" }} first dashboard&hellip;</div>
-    <div class="bar"><span></span></div>
-    {# Keep the button name in sync with settings/home.html. #}
-    <div class="waiting-sub">
-        The next run writes it, usually within a few minutes, and this page fills
-        itself in. To have it now, open the settings page and press
-        &ldquo;Write first daily message&rdquo;.
-    </div>
-</div>
-
 {% elif view.state == 'waiting' %}
 {# Nothing is being written, and the screen must not say it is: the household
    is still the invented one or the timezone is unset, and the settings home
@@ -690,7 +665,7 @@
     <div class="waiting-head">Nearly there</div>
     <div class="waiting-sub">
         Finish the set-up steps on the settings page, and this screen fills
-        itself in as soon as the first dashboard is written.
+        itself in as soon as you're done.
     </div>
 </div>
 
@@ -725,6 +700,14 @@
         <svg class="moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"></path></svg>
         Theme
     </button>
+    {% if settings_url %}
+    {# Self-hosted only, and in its own tab: the dashboard reloads itself for years, so a panel that
+       followed this in place would be stranded on a settings page. A hosted screen has no session to
+       reach settings with, and is passed no link. #}
+    <a class="nav-btn" href="{{ settings_url }}" target="_blank" rel="noopener" aria-label="Settings">
+        <svg viewBox="0 0 24 24"><path d="M4 7h9M19 7h1M4 17h1M11 17h9"></path><circle cx="16" cy="7" r="2.6"></circle><circle cx="8" cy="17" r="2.6"></circle></svg>Settings
+    </a>
+    {% endif %}
     {% if view.legend %}
     <div class="legend">
         {% for item in view.legend %}<div class="legend-item cal-{{ item.color }}"><span class="dot"></span>{{ item.label }}</div>{% endfor %}
