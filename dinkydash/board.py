@@ -186,6 +186,31 @@ def build_month(fetched, today, clock, colors, first_day=0):
     return {"title": first.strftime("%B %Y"), "weekdays": names, "weeks": weeks}
 
 
+def build_rolling(fetched, today, clock, colors, first_day=0, weeks=4):
+    """The week holding `today` as the top row, then the weeks that follow it.
+
+    Drawn like the month, but it starts at this week rather than the first of
+    the month, so what is coming is always on screen. The first day of a month
+    carries its month name, since the grid crosses month ends.
+    """
+    start = today - timedelta(days=(today.weekday() - first_day) % 7)
+    rows, day = [], start
+    for _ in range(weeks):
+        row = []
+        for _ in range(7):
+            chips, more = _chips(fetched, day, clock, colors, MAX_MONTH_CELL)
+            row.append({
+                "iso": day.isoformat(), "num": day.day, "in_month": True,
+                "label": f"{day.strftime('%b')} {day.day}" if day.day == 1 else None,
+                "is_today": day == today, "events": chips, "more": more,
+            })
+            day += timedelta(days=1)
+        rows.append(row)
+    last = day - timedelta(days=1)
+    names = [(start + timedelta(days=i)).strftime("%a") for i in range(7)]
+    return {"title": _span(start, last), "weekdays": names, "weeks": rows}
+
+
 def reload_seconds(config):
     """How long the dashboard waits before rendering itself again.
 
@@ -224,6 +249,7 @@ def build_view(config, payload, today, now=None):
         "legend": [{"label": label, "color": color} for label, color in colors.items()],
         "week": None,
         "week5": None,
+        "rolling": None,
         "month": None,
         "theme": theme,
         # The times are already written for this family below; the template
@@ -278,6 +304,7 @@ def build_view(config, payload, today, now=None):
     view["week"] = build_week(fetched, today, clock, colors, first_day)
     view["week5"] = build_week(fetched, today, clock, colors, first_day, length=5)
     view["month"] = build_month(fetched, today, clock, colors, first_day)
+    view["rolling"] = build_rolling(fetched, today, clock, colors, first_day)
 
     stale = payload.get("generated_for_date") != today.isoformat()
     view["stale"] = stale

@@ -637,3 +637,36 @@ class TestMonthChipsHaveNoTimes:
         page = self.page(tmp_path, monkeypatch)
         assert 'data-view-set="week5"' in page and 'data-view-set="week"' in page
         assert 'data-panel="week5"' in page
+
+
+class TestFourWeeks:
+    def test_the_top_row_is_this_week_and_three_more_follow(self):
+        view = build_view(CONFIG, payload("2026-09-03"), TODAY)  # a Thursday
+        rolling = view["rolling"]
+        assert len(rolling["weeks"]) == 4
+        assert rolling["weeks"][0][0]["iso"] == "2026-08-31"  # that week's Monday
+        assert rolling["weeks"][-1][-1]["iso"] == "2026-09-27"
+        assert rolling["title"] == "31 Aug – 27 Sep"
+        assert [c["is_today"] for w in rolling["weeks"] for c in w].count(True) == 1
+
+    def test_the_first_of_a_month_carries_its_name(self):
+        view = build_view(CONFIG, payload("2026-09-03"), TODAY)
+        cells = {c["iso"]: c for w in view["rolling"]["weeks"] for c in w}
+        assert cells["2026-09-01"]["label"] == "Sep 1"
+        assert cells["2026-09-02"]["label"] is None
+
+    def test_events_are_coloured_like_every_other_view(self):
+        events = [on("2026-09-10", "Dinner", "Family")]
+        view = build_view({**CONFIG, **CALENDARS}, payload("2026-09-03", events), TODAY)
+        cell = {c["iso"]: c for w in view["rolling"]["weeks"] for c in w}["2026-09-10"]
+        assert cell["events"][0]["color"] == "green"
+
+    def test_it_follows_the_sunday_start(self):
+        view = build_view({**CONFIG, "week_start": "sunday"}, payload("2026-09-03"), TODAY)
+        assert view["rolling"]["weeks"][0][0]["iso"] == "2026-08-30"
+
+    def test_the_page_offers_it_with_titles_only(self, tmp_path, monkeypatch):
+        page = TestTheSidebarOnTheDashboard().page(tmp_path, monkeypatch)
+        assert 'data-view-set="rolling"' in page and 'data-panel="rolling"' in page
+        rolling = page[page.index('<section class="view-month" data-panel="rolling"'):]
+        assert 'class="chip-time"' not in rolling

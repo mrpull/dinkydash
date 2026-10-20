@@ -20,6 +20,21 @@
 {% macro chip(event, times=true) %}
 <div class="chip cal-{{ event.color }}{{ ' all-day' if event.all_day }}" title="{{ event.calendar }}">{% if times and not event.all_day %}<span class="chip-time">{{ event.time }}</span> {% endif %}{{ event.title }}</div>
 {% endmacro -%}
+{% macro month_panel(grid, name, label) %}
+<section class="view-month" data-panel="{{ name }}" aria-label="{{ label }}">
+    <div class="view-title">{{ grid.title }}</div>
+    <div class="month" style="--weeks: {{ grid.weeks|length }}">
+        {% for day_name in grid.weekdays %}<div class="month-name">{{ day_name }}</div>{% endfor %}
+        {% for week in grid.weeks %}{% for cell in week %}
+        <div class="month-cell{{ ' today' if cell.is_today }}{{ '' if cell.in_month else ' outside' }}">
+            <div class="month-num">{{ cell.label or cell.num }}</div>
+            {% for e in cell.events %}{{ chip(e, false) }}{% endfor %}
+            {% if cell.more %}<div class="more-chip">+{{ cell.more }} more</div>{% endif %}
+        </div>
+        {% endfor %}{% endfor %}
+    </div>
+</section>
+{% endmacro -%}
 {% macro week_panel(week, name, label) %}
 <section class="view-week" data-panel="{{ name }}" aria-label="{{ label }}">
     <div class="view-title">{{ week.title }}</div>
@@ -81,7 +96,7 @@
         try {
             var r = document.documentElement;
             var v = localStorage.getItem("dd-view"), t = localStorage.getItem("dd-theme");
-            if (v === "day" || v === "week" || v === "week5" || v === "month") { r.setAttribute("data-view", v); }
+            if (v === "day" || v === "week" || v === "week5" || v === "month" || v === "rolling") { r.setAttribute("data-view", v); }
             if (t === "light" || t === "dark") { r.setAttribute("data-theme", t); }
         } catch (e) {}
     })();
@@ -227,10 +242,10 @@
         [data-view]:not([data-view="day"]) .day-only { display: none; }
         /* The week and month views give their height to the days: no family name or date
            row above the title, and slim margins round the cards. */
-        [data-view="week5"] .head, [data-view="week"] .head, [data-view="month"] .head { display: none; }
-        [data-view="week5"] .board, [data-view="week"] .board, [data-view="month"] .board { padding: 0.9rem 0.7rem 0.6rem; }
+        [data-view="week5"] .head, [data-view="week"] .head, [data-view="month"] .head, [data-view="rolling"] .head { display: none; }
+        [data-view="week5"] .board, [data-view="week"] .board, [data-view="month"] .board, [data-view="rolling"] .board { padding: 0.9rem 0.7rem 0.6rem; }
         [data-view="week"] .view-week[data-panel="week"], [data-view="week5"] .view-week[data-panel="week5"],
-        [data-view="month"] .view-month {
+        [data-view="month"] .view-month[data-panel="month"], [data-view="rolling"] .view-month[data-panel="rolling"] {
             display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0;
         }
         .view-title { font-size: 1.9rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 0.7rem; flex-shrink: 0; }
@@ -292,7 +307,7 @@
         .nav-btn { appearance: none; border: 0; background: transparent; color: var(--text-muted); font: inherit; font-weight: 800; font-size: 0.78em; font-size: max(0.78em, 11px); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.705em 0.9em; border-radius: 1.025em; cursor: pointer; min-width: 5.385em; }
         .nav-btn svg { width: 1.923em; height: 1.923em; margin-bottom: 0.256em; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
         .nav-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-        [data-view="day"] [data-view-set="day"], [data-view="week"] [data-view-set="week"], [data-view="week5"] [data-view-set="week5"], [data-view="month"] [data-view-set="month"] { background: var(--accent); color: var(--bg); }
+        [data-view="day"] [data-view-set="day"], [data-view="week"] [data-view-set="week"], [data-view="week5"] [data-view-set="week5"], [data-view="month"] [data-view-set="month"], [data-view="rolling"] [data-view-set="rolling"] { background: var(--accent); color: var(--bg); }
         .nav-spacer { flex: 1 1 auto; }
         .theme-btn .moon { display: none; }
         [data-theme="dark"] .theme-btn .sun { display: none; }
@@ -653,6 +668,9 @@
     <button type="button" class="nav-btn" data-view-set="week" aria-label="Seven-day week">
         <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2.5"></rect><path d="M4 10h16M9 3v4M15 3v4M7.5 14h9M7.5 17h9"></path></svg>7 Day
     </button>
+    <button type="button" class="nav-btn" data-view-set="rolling" aria-label="Four weeks from this week">
+        <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2.5"></rect><path d="M4 10h16M9 3v4M15 3v4M8 13.5h8M8 16.5h8"></path></svg>4 Weeks
+    </button>
     <button type="button" class="nav-btn" data-view-set="month" aria-label="Month">
         <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2.5"></rect><path d="M4 10h16M9 3v4M15 3v4M9 14h.01M12 14h.01M15 14h.01M9 17h.01M12 17h.01"></path></svg>Month
     </button>
@@ -739,21 +757,8 @@
     {% if view.week %}{{ week_panel(view.week, "week", "Week") }}{% endif %}
     {% if view.week5 %}{{ week_panel(view.week5, "week5", "Work week") }}{% endif %}
 
-    {% if view.month %}
-    <section class="view-month" aria-label="Month">
-        <div class="view-title">{{ view.month.title }}</div>
-        <div class="month" style="--weeks: {{ view.month.weeks|length }}">
-            {% for name in view.month.weekdays %}<div class="month-name">{{ name }}</div>{% endfor %}
-            {% for week in view.month.weeks %}{% for cell in week %}
-            <div class="month-cell{{ ' today' if cell.is_today }}{{ '' if cell.in_month else ' outside' }}">
-                <div class="month-num">{{ cell.num }}</div>
-                {% for e in cell.events %}{{ chip(e, false) }}{% endfor %}
-                {% if cell.more %}<div class="more-chip">+{{ cell.more }} more</div>{% endif %}
-            </div>
-            {% endfor %}{% endfor %}
-        </div>
-    </section>
-    {% endif %}
+    {% if view.month %}{{ month_panel(view.month, "month", "Month") }}{% endif %}
+    {% if view.rolling %}{{ month_panel(view.rolling, "rolling", "Four weeks") }}{% endif %}
 </div>
 </div>
 
