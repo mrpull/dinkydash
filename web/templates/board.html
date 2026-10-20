@@ -279,10 +279,14 @@
 
         /* The sidebar. Icons are inline SVG; the active view is read off
            <html data-view>, so a refresh cannot leave the wrong one lit. */
-        .side-nav { background: var(--side-bg); display: flex; flex-direction: row; align-items: center; padding: 0.5rem 1rem; flex-shrink: 0; }
-        .side-nav > * + * { margin-left: 0.5rem; }
-        .nav-btn { appearance: none; border: 0; background: transparent; color: var(--text-muted); font: inherit; font-weight: 800; font-size: 0.78rem; font-size: max(0.78rem, 11px); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.55rem 0.7rem; border-radius: 0.8rem; cursor: pointer; min-width: 4.2rem; }
-        .nav-btn svg { width: 1.5rem; height: 1.5rem; margin-bottom: 0.2rem; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+        /* Sized in em off one font size, so every view draws it the same: the
+           script sets --side-fs to the day view's root size (see fit()), and
+           without it the sidebar follows the root as before. */
+        .side-nav { font-size: var(--side-fs, 1rem); background: var(--side-bg); display: flex; flex-direction: row; align-items: center; padding: 0.5em 1em; flex-shrink: 0; }
+        /* A margin is in em of the child, and a button is 0.78 of the bar. */
+        .side-nav > * + * { margin-left: 0.64em; }
+        .nav-btn { appearance: none; border: 0; background: transparent; color: var(--text-muted); font: inherit; font-weight: 800; font-size: 0.78em; font-size: max(0.78em, 11px); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.705em 0.9em; border-radius: 1.025em; cursor: pointer; min-width: 5.385em; }
+        .nav-btn svg { width: 1.923em; height: 1.923em; margin-bottom: 0.256em; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
         .nav-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
         [data-view="day"] [data-view-set="day"], [data-view="week"] [data-view-set="week"], [data-view="week5"] [data-view-set="week5"], [data-view="month"] [data-view-set="month"] { background: var(--accent); color: var(--bg); }
         .nav-spacer { flex: 1 1 auto; }
@@ -292,11 +296,11 @@
         .legend { display: none; }
         @media (min-aspect-ratio: 5/4) and (min-width: 640px) {
             .shell { flex-direction: row; }
-            .side-nav { flex-direction: column; padding: 1.2rem 0.7rem; width: 6.4rem; align-items: stretch; }
-            .side-nav > * + * { margin-left: 0; margin-top: 0.4rem; }
-            .legend { display: block; margin-top: 0.6rem; }
-            .legend-item { display: flex; align-items: center; font-size: 0.72rem; font-size: max(0.72rem, 11px); font-weight: 700; color: var(--text-muted); line-height: 1.2; margin-top: 0.4rem; }
-            .legend-item .dot { flex-shrink: 0; margin-right: 0.4rem; }
+            .side-nav { flex-direction: column; padding: 1.2em 0.7em; width: var(--side-w, 6.4rem); align-items: stretch; }
+            .side-nav > * + * { margin-left: 0; margin-top: 0.513em; }
+            .legend { display: block; margin-top: 0.6em; }
+            .legend-item { display: flex; align-items: center; font-size: 0.72em; font-size: max(0.72em, 11px); font-weight: 700; color: var(--text-muted); line-height: 1.2; margin-top: 0.556em; }
+            .legend-item .dot { flex-shrink: 0; margin-right: 0.556em; }
         }
         /* Narrow screens: a week of seven columns cannot read, so it becomes a
            list of days. */
@@ -312,7 +316,7 @@
             .month .chip { font-size: 0; height: 0.4rem; padding: 0; border-left-width: 0; }
             .week-day-head { flex-direction: column; align-items: flex-start; width: 3.2rem; flex-shrink: 0; margin-bottom: 0; }
             .week-events { flex: 1 1 auto; }
-            .nav-btn { min-width: 3.4rem; padding: 0.4rem 0.5rem; }
+            .nav-btn { min-width: 4.36em; padding: 0.513em 0.64em; }
         }
 
 
@@ -887,15 +891,44 @@
         }
     }
 
-    function fit() {
+    function fitDay() {
         fitOnce();
-        if (root.getAttribute("data-view") !== "day") { fitCells(); return; }
         if (window.visualViewport && window.visualViewport.scale > 1) { return; }
         var room = window.innerHeight, size = parseFloat(root.style.fontSize);
         for (var i = 0; i < 24 && size > 11 && naturalHeight() > room; i++) {
             size = Math.max(11, size * 0.98);
             root.style.fontSize = size + "px";
         }
+    }
+
+    // The sidebar is the same in every view: as wide, and with icons and labels
+    // the same size. Both follow the root size, which the day fit chooses from
+    // that day's content and the other views set flat, so the day view is
+    // fitted (unseen: nothing paints between these lines) and its width and
+    // font size carried across as pixels.
+    function sideWidth() {
+        var nav = document.querySelector(".side-nav");
+        return nav ? nav.getBoundingClientRect().width : 0;
+    }
+
+    function fit() {
+        var view = root.getAttribute("data-view") || "day";
+        root.style.removeProperty("--side-w");
+        root.style.removeProperty("--side-fs");
+        if (view === "day") {
+            fitDay();
+            return;
+        }
+        root.setAttribute("data-view", "day");
+        fitDay();
+        var width = sideWidth(), size = root.style.fontSize;
+        root.setAttribute("data-view", view);
+        if (width) {
+            root.style.setProperty("--side-w", width + "px");
+            root.style.setProperty("--side-fs", size);
+        }
+        fitOnce();
+        fitCells();
     }
 
     function fitOnce() {
