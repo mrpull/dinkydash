@@ -744,3 +744,54 @@ class TestTheDayModalOnTheDashboard:
         store = page[page.index('class="day-store"'):page.index('class="day-modal"')]
         assert "<script>alert(1)</script>" not in store
         assert "&lt;script&gt;alert(1)&lt;/script&gt;" in store
+
+
+class TestFirstRunWithHeadlinesOff:
+    """With `ai_headline: false` nothing is written, so nothing may say it is."""
+
+    def client(self, tmp_path, flag="false"):
+        from dinkydash.store import FileStore
+        from tests.conftest import client_for
+        from web import create_app
+
+        path = tmp_path / "config.yaml"
+        path.write_text('family_name: "The Wilsons"\ntimezone: "Europe/Berlin"\n'
+                        f'ai_headline: {flag}\n')
+        return client_for(create_app(FileStore(path)))
+
+    def test_the_waiting_screen_says_the_calendars_are_coming_not_a_headline(self, tmp_path):
+        page = self.client(tmp_path).get("/").get_data(as_text=True)
+        assert "Fetching The Wilsons&#39;s calendars" in page or "calendars&hellip;" in page
+        assert "Refresh calendars" in page
+        assert "Write first daily message" not in page
+        assert "Writing" not in page
+
+    def test_with_headlines_on_it_still_says_it_is_writing(self, tmp_path):
+        page = self.client(tmp_path, "true").get("/").get_data(as_text=True)
+        assert "Writing" in page and "Write first daily message" in page
+
+    def test_the_settings_page_offers_a_refresh_rather_than_a_write_button(self, tmp_path):
+        page = self.client(tmp_path).get("/settings/").get_data(as_text=True)
+        assert "Refresh calendars" in page
+        assert "Write first daily message" not in page
+
+    def status(self, tmp_path, config, payload):
+        from dinkydash.store import FileStore
+        from web import create_app
+        from web.setup import status
+
+        path = tmp_path / "config.yaml"
+        path.write_text('timezone: "Europe/Berlin"\n')
+        with create_app(FileStore(path)).test_request_context("/settings/"):
+            return status(config, payload)
+
+    def test_one_fetch_ends_set_up_mode_and_a_headline_is_not_needed(self, tmp_path):
+        config = {"timezone": "Europe/Berlin", "ai_headline": False, "people": []}
+        assert self.status(tmp_path, config, None)["in_progress"] is True
+        fetched = {"calendars_fetched_at": "2026-09-03T08:00:00+00:00"}
+        assert self.status(tmp_path, config, fetched)["in_progress"] is False
+
+    def test_with_headlines_on_the_fetch_alone_does_not_end_it(self, tmp_path):
+        config = {"timezone": "Europe/Berlin", "people": []}
+        fetched = {"calendars_fetched_at": "2026-09-03T08:00:00+00:00"}
+        assert self.status(tmp_path, config, fetched)["in_progress"] is True

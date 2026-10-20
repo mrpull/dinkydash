@@ -654,6 +654,19 @@
     <div class="waiting-sub">Dashboard updates are paused. Open your settings on a phone or computer to manage your account.</div>
 </div>
 
+{% elif view.state == 'waiting' and view.set_up and not view.ai_headline %}
+{# Headlines are off, so the first thing to arrive is the calendars. #}
+<div class="waiting">
+    <div class="family">DinkyDash</div>
+    <div class="waiting-head">Fetching {{ view.family_name or "your" }}{{ "'s" if view.family_name else "" }} calendars&hellip;</div>
+    <div class="bar"><span></span></div>
+    <div class="waiting-sub">
+        The next refresh brings them in, usually within a few minutes, and this
+        page fills itself in. To fetch them now, open the settings page and press
+        &ldquo;Refresh calendars&rdquo;.
+    </div>
+</div>
+
 {% elif view.state == 'waiting' and view.set_up %}
 <div class="waiting">
     <div class="family">DinkyDash</div>

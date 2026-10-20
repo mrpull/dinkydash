@@ -133,9 +133,15 @@
         {# Keep this label in sync with the waiting screen in board.html. #}
         <button class="btn" type="submit">Write first daily message</button>
     </form>
+    {% else %}
+    <form class="inline-form" method="post" action="{{ url_for('settings.refresh_now') }}" data-pending="Refreshing your calendars…">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {# Keep this label in sync with the waiting screen in board.html. #}
+        <button class="btn" type="submit">Refresh calendars</button>
+    </form>
     {% endif %}
     <div class="hint">
-        It writes itself within a few minutes anyway; this is the shortcut. Everything above can
+        {{ 'It writes itself' if config.ai_headline is not sameas false else 'It refreshes itself' }} within a few minutes anyway; this is the shortcut. Everything above can
         still be changed afterwards.
     </div>
 </div>

@@ -25,12 +25,19 @@ def status(config, payload):
     `in_progress` while the family is not set up *or* no brief has been
     written yet — the second half because a set-up family waiting for its
     first dashboard still wants the screen link and the button, not a status line
-    about a dashboard that does not exist. `ready` is when the screen step may be
+    about a dashboard that does not exist. With `ai_headline` off, "written" means
+    the calendars have been fetched. `ready` is when the screen step may be
     shown: the household is real and the timezone chosen, so a dashboard written
     now would be theirs.
     """
     set_up = config_module.is_set_up(config)
-    written = bool((payload or {}).get("generated_for_date"))
+    payload = payload or {}
+    # With headlines off nothing is ever "written": the dashboard is there as
+    # soon as the calendars have been fetched once.
+    if config_module.ai_headline_enabled(config):
+        written = bool(payload.get("generated_for_date"))
+    else:
+        written = bool(payload.get("calendars_fetched_at"))
     return {
         "in_progress": not (set_up and written),
         "ready": set_up,

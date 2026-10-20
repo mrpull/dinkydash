@@ -18,7 +18,7 @@ from datetime import date, datetime, timedelta
 
 from .calendars import events_on, feed_label
 from .clock import clock_of, format_time
-from .config import is_set_up
+from .config import ai_headline_enabled, is_set_up
 from .context import build_countdowns, compute_chore_assignments
 from .schedule import brief_due, refresh_interval
 
@@ -268,6 +268,9 @@ def build_view(config, payload, today, now=None):
     colors = calendar_colors(config)
     view = {
         "family_name": config.get("family_name", ""),
+        # Whether a headline is on its way: the waiting screen says so, or says
+        # the calendars are.
+        "ai_headline": ai_headline_enabled(config),
         # Shown under the sidebar so a colour can be traced to its calendar.
         "legend": [{"label": label, "color": color} for label, color in colors.items()],
         "week": None,
