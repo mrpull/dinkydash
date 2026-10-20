@@ -26,7 +26,7 @@
     <div class="month" style="--weeks: {{ grid.weeks|length }}">
         {% for day_name in grid.weekdays %}<div class="month-name">{{ day_name }}</div>{% endfor %}
         {% for week in grid.weeks %}{% for cell in week %}
-        <div class="month-cell{{ ' today' if cell.is_today }}{{ '' if cell.in_month else ' outside' }}">
+        <div class="month-cell{{ ' today' if cell.is_today }}{{ '' if cell.in_month else ' outside' }}" data-date="{{ cell.iso }}" role="button" tabindex="0">
             <div class="month-num">{{ cell.label or cell.num }}</div>
             {% for e in cell.events %}{{ chip(e, false) }}{% endfor %}
             {% if cell.more %}<div class="more-chip">+{{ cell.more }} more</div>{% endif %}
@@ -40,7 +40,7 @@
     <div class="view-title">{{ week.title }}</div>
     <div class="week" style="--cols: {{ week.days|length }}">
         {% for day in week.days %}
-        <div class="week-day{{ ' today' if day.is_today }}">
+        <div class="week-day{{ ' today' if day.is_today }}" data-date="{{ day.iso }}" role="button" tabindex="0">
             <div class="week-day-head"><span class="wd-name">{{ day.weekday }}</span><span class="wd-num">{{ day.num }}</span></div>
             <div class="week-events">
                 {% for e in day.events %}{{ chip(e) }}{% endfor %}
@@ -120,6 +120,7 @@
             --warn-fg: #b45309;
             --stale-box: #faf6f1;
             --line: #eadfd3;
+            --scrim: rgba(45, 35, 25, 0.45);
             --side-bg: #fff5ec;
             /* The agenda's time column. It does not shrink, so it is sized for
                the widest time that clock can write, and today and tomorrow
@@ -143,6 +144,7 @@
             --warn-fg: #f2b968;
             --stale-box: #221b16;
             --line: #3a2e26;
+            --scrim: rgba(0, 0, 0, 0.6);
             --side-bg: #241c17;
         }
 
@@ -568,6 +570,36 @@
             margin-right: 0.7rem;
         }
 
+
+        /* A click on a day in the week, month or four-week view opens that day in
+           full. It carries the page's own tokens and the calendars' colours, so
+           it follows the theme and reads like the cards behind it. */
+        .month-cell[data-date], .week-day[data-date] { cursor: pointer; }
+        .month-cell[data-date]:focus-visible, .week-day[data-date]:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+        @media (hover: hover) {
+            .month-cell[data-date]:hover:not(.today), .week-day[data-date]:hover:not(.today) { box-shadow: inset 0 0 0 1px var(--line); }
+        }
+        .day-modal { position: fixed; left: 0; top: 0; right: 0; bottom: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+        .day-modal[hidden] { display: none; }
+        .day-scrim { position: absolute; left: 0; top: 0; right: 0; bottom: 0; background: var(--scrim); }
+        .day-card { position: relative; width: 30rem; max-width: 100%; max-height: 100%; display: flex; flex-direction: column; background: var(--box); color: var(--text); border-radius: 1.1rem; padding: 1.1rem 1.2rem 1.2rem; box-shadow: 0 0 0 1px var(--line), 0 1rem 3rem var(--scrim); outline: none; }
+        .day-head { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; margin-bottom: 0.7rem; }
+        .day-head h2 { font-size: 1.35rem; font-weight: 800; letter-spacing: -0.02em; }
+        .day-close { appearance: none; -webkit-appearance: none; border: 0; background: transparent; color: var(--text-muted); width: 2.2rem; height: 2.2rem; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-left: 0.8rem; }
+        .day-close svg { width: 1.2rem; height: 1.2rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+        .day-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+        @media (hover: hover) { .day-close:hover { background: var(--stale-box); color: var(--text); } }
+        .day-body { min-height: 0; overflow-y: auto; }
+        .dm-ev { display: flex; align-items: baseline; background: var(--c-bg); color: var(--c-fg); border-left: 0.25rem solid var(--c-bar); border-radius: 0.5rem; padding: 0.5rem 0.75rem; margin-top: 0.4rem; }
+        .dm-ev:first-child { margin-top: 0; }
+        .dm-ev > * + * { margin-left: 0.8rem; }
+        .dm-time { font-weight: 800; font-size: 0.95rem; min-width: 4.6rem; flex-shrink: 0; white-space: nowrap; }
+        .dm-main { min-width: 0; }
+        .dm-title { font-weight: 700; font-size: 1.05rem; line-height: 1.25; overflow-wrap: break-word; }
+        .dm-where { font-weight: 600; font-size: 0.85rem; line-height: 1.3; margin-top: 0.15rem; overflow-wrap: break-word; }
+        .dm-ev.all-day { background: var(--c-bar); color: var(--bg); }
+        .dm-empty { color: var(--text-muted); font-weight: 700; padding: 0.4rem 0; }
+
         /* Flex gap, where it exists. The shorthand on `.body` also sets the
            grid's column gutter, so the landscape query puts `column-gap` back
            afterwards. Margins cleared here are the fallbacks above. */
@@ -760,6 +792,39 @@
     {% if view.month %}{{ month_panel(view.month, "month", "Month") }}{% endif %}
     {% if view.rolling %}{{ month_panel(view.rolling, "rolling", "Four weeks") }}{% endif %}
 </div>
+</div>
+
+{# Every event on each day the grids can show, for the modal below. Hidden, and
+   copied into the card by the script, so the words are autoescaped like any
+   other row on the page. #}
+<div class="day-store" hidden>
+    {% for d in view.details %}
+    <div class="day-detail" data-date="{{ d.iso }}" data-heading="{{ d.heading }}">
+        {% for e in d.events %}
+        <div class="dm-ev cal-{{ e.color }}{{ ' all-day' if e.all_day }}">
+            <div class="dm-time">{{ 'All day' if e.all_day else e.time }}</div>
+            <div class="dm-main">
+                <div class="dm-title">{{ e.title }}</div>
+                {% if e.location %}<div class="dm-where">{{ e.location }}</div>{% endif %}
+            </div>
+        </div>
+        {% else %}
+        <div class="dm-empty">Nothing booked.</div>
+        {% endfor %}
+    </div>
+    {% endfor %}
+</div>
+<div class="day-modal" hidden>
+    <div class="day-scrim" data-day-close></div>
+    <div class="day-card" role="dialog" aria-modal="true" aria-labelledby="day-heading" tabindex="-1">
+        <div class="day-head">
+            <h2 id="day-heading"></h2>
+            <button type="button" class="day-close" data-day-close aria-label="Close">
+                <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+            </button>
+        </div>
+        <div class="day-body"></div>
+    </div>
 </div>
 
 {% endif %}
@@ -986,9 +1051,73 @@
         var colour = document.querySelector('meta[name="theme-color"]');
         if (colour) { colour.setAttribute("content", theme === "dark" ? "#17120f" : "#ffffff"); }
     }
+
+    /* ---- the day modal -------------------------------------------------- */
+
+    var IDLE_MS = 60000;        // a wall panel has nobody to close it
+    var dayTimer = null;
+    var dayFrom = null;         // what had focus, so closing can give it back
+
+    function dayModal() { return document.querySelector(".day-modal"); }
+    function openIso() {
+        var modal = dayModal();
+        return modal && !modal.hidden ? modal.getAttribute("data-open") : null;
+    }
+    function armIdle() {
+        clearTimeout(dayTimer);
+        dayTimer = setTimeout(closeDay, IDLE_MS);
+    }
+    function openDay(iso, from) {
+        var modal = dayModal();
+        var details = document.querySelectorAll(".day-detail");
+        var found = null;
+        for (var i = 0; i < details.length; i++) {
+            if (details[i].getAttribute("data-date") === iso) { found = details[i]; }
+        }
+        if (!modal || !found) { return; }
+        modal.querySelector("#day-heading").textContent = found.getAttribute("data-heading");
+        modal.querySelector(".day-body").innerHTML = found.innerHTML;
+        modal.setAttribute("data-open", iso);
+        modal.hidden = false;
+        if (from) { dayFrom = from; }
+        modal.querySelector(".day-close").focus();
+        armIdle();
+    }
+    function closeDay() {
+        var modal = dayModal();
+        clearTimeout(dayTimer);
+        if (!modal || modal.hidden) { return; }
+        modal.hidden = true;
+        modal.removeAttribute("data-open");
+        if (dayFrom && dayFrom.focus && document.body.contains(dayFrom)) { dayFrom.focus(); }
+        dayFrom = null;
+    }
+    // Any touch of the open modal counts as somebody being there.
+    ["mousedown", "touchstart", "keydown", "scroll"].forEach(function (name) {
+        document.addEventListener(name, function () { if (openIso()) { armIdle(); } }, true);
+    });
+    document.addEventListener("keydown", function (event) {
+        var key = event.key;
+        if (openIso()) {
+            if (key === "Escape" || key === "Esc") { closeDay(); }
+            // Nothing in the card takes focus but its close button.
+            else if (key === "Tab") { event.preventDefault(); dayModal().querySelector(".day-close").focus(); }
+            return;
+        }
+        if ((key === "Enter" || key === " ") && event.target && event.target.hasAttribute &&
+                event.target.hasAttribute("data-date") && event.target.closest(".view-week, .view-month")) {
+            event.preventDefault();
+            openDay(event.target.getAttribute("data-date"), event.target);
+        }
+    });
     document.addEventListener("click", function (event) {
         var target = event.target && event.target.closest ? event.target : null;
         if (!target) { return; }
+        if (target.closest("[data-day-close]")) { closeDay(); return; }
+        if (!openIso() && root.getAttribute("data-view") !== "day") {
+            var cell = target.closest(".month-cell[data-date], .week-day[data-date]");
+            if (cell) { openDay(cell.getAttribute("data-date"), cell); return; }
+        }
         var viewButton = target.closest("[data-view-set]");
         if (viewButton) {
             var chosen = viewButton.getAttribute("data-view-set");
@@ -1134,7 +1263,9 @@
         // A parsed document's scripts never run, and this one is already running.
         var scripts = next.body.querySelectorAll("script");
         for (var i = 0; i < scripts.length; i++) { scripts[i].parentNode.removeChild(scripts[i]); }
+        var reopen = openIso();
         document.body.parentNode.replaceChild(next.body, document.body);
+        if (reopen) { openDay(reopen); }
         fit();
     }
 

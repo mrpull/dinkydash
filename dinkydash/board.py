@@ -211,6 +211,29 @@ def build_rolling(fetched, today, clock, colors, first_day=0, weeks=4):
     return {"title": _span(start, last), "weekdays": names, "weeks": rows}
 
 
+def _day_order(event):
+    """All-day events first, then by start; an event with no start sorts with its day."""
+    return (not event.get("all_day"), event.get("start") or "")
+
+
+def build_details(fetched, days, clock, colors):
+    """Every event on each of `days`, for the modal a click on a day opens.
+
+    The grids hold only what fits a cell, so the full day comes from here. One
+    entry per distinct date, in date order, with the heading the modal shows.
+    """
+    details = []
+    for day in sorted(set(days)):
+        events = as_shown(sorted(events_on(fetched, day), key=_day_order), clock, colors)
+        details.append({
+            "iso": day.isoformat(),
+            "heading": day.strftime("%A, %-d %B"),
+            "events": [{k: e.get(k) for k in ("title", "time", "all_day", "location", "color", "calendar")}
+                       for e in events],
+        })
+    return details
+
+
 def reload_seconds(config):
     """How long the dashboard waits before rendering itself again.
 
@@ -250,6 +273,7 @@ def build_view(config, payload, today, now=None):
         "week": None,
         "week5": None,
         "rolling": None,
+        "details": [],
         "month": None,
         "theme": theme,
         # The times are already written for this family below; the template
@@ -305,6 +329,10 @@ def build_view(config, payload, today, now=None):
     view["week5"] = build_week(fetched, today, clock, colors, first_day, length=5)
     view["month"] = build_month(fetched, today, clock, colors, first_day)
     view["rolling"] = build_rolling(fetched, today, clock, colors, first_day)
+    shown = [date.fromisoformat(cell["iso"])
+             for grid in (view["month"], view["rolling"]) for week in grid["weeks"] for cell in week]
+    shown += [date.fromisoformat(d["iso"]) for d in view["week"]["days"]]
+    view["details"] = build_details(fetched, shown, clock, colors)
 
     stale = payload.get("generated_for_date") != today.isoformat()
     view["stale"] = stale

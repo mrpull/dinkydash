@@ -670,3 +670,77 @@ class TestFourWeeks:
         assert 'data-view-set="rolling"' in page and 'data-panel="rolling"' in page
         rolling = page[page.index('<section class="view-month" data-panel="rolling"'):]
         assert 'class="chip-time"' not in rolling
+
+
+class TestDayDetails:
+    """What the day modal shows: every event on a day, not the few a cell has room for."""
+
+    def view(self, events, config=None):
+        return build_view({**CONFIG, **CALENDARS, **(config or {})}, payload("2026-09-03", events), TODAY)
+
+    def detail(self, view, iso):
+        return next(d for d in view["details"] if d["iso"] == iso)
+
+    def test_a_crowded_day_keeps_every_event_that_its_cell_drops(self):
+        events = [on("2026-09-03", f"Thing {i}", "Family", f"{8 + i:02d}:00") for i in range(9)]
+        view = self.view(events)
+        cell = [c for w in view["month"]["weeks"] for c in w if c["iso"] == "2026-09-03"][0]
+        assert len(cell["events"]) < 9
+        assert [e["title"] for e in self.detail(view, "2026-09-03")["events"]] == [f"Thing {i}" for i in range(9)]
+
+    def test_all_day_events_come_first_and_colours_match_the_grids(self):
+        events = [on("2026-09-03", "Dinner", "Family", "18:00"),
+                  on("2026-09-03", "Holiday", "Kallee & Jake", None, all_day=True)]
+        day = self.detail(self.view(events), "2026-09-03")
+        assert [(e["title"], e["color"]) for e in day["events"]] == [("Holiday", "blue"), ("Dinner", "green")]
+
+    def test_times_follow_the_familys_clock(self):
+        events = [on("2026-09-03", "Dinner", "Family", "17:45")]
+        day = self.detail(self.view(events, {"clock": "12h"}), "2026-09-03")
+        assert day["events"][0]["time"] == "5:45 pm"
+
+    def test_every_day_a_grid_can_show_has_a_detail(self):
+        view = self.view([])
+        dates = {c["iso"] for g in (view["month"], view["rolling"]) for w in g["weeks"] for c in w}
+        dates |= {d["iso"] for d in view["week"]["days"]}
+        assert dates <= {d["iso"] for d in view["details"]}
+        assert self.detail(view, "2026-09-03")["heading"] == "Thursday, 3 September"
+
+    def test_an_empty_day_still_has_a_detail(self):
+        assert self.detail(self.view([]), "2026-09-04")["events"] == []
+
+
+class TestTheDayModalOnTheDashboard:
+    def page(self, tmp_path, monkeypatch, title="Dinner"):
+        from dinkydash import config as config_module
+        from dinkydash.store import FileStore
+        from tests.conftest import client_for
+        from web import create_app
+
+        path = tmp_path / "config.yaml"
+        path.write_text('family_name: "The Wilsons"\ntimezone: "Europe/Berlin"\n'
+                        'calendars:\n  - label: "Family"\n    url: "https://example.invalid/x.ics"\n')
+        (tmp_path / "dashboard_data.json").write_text(json.dumps(payload(
+            "2026-09-03", [on("2026-09-03", title, "Family")])))
+        moment = datetime(2026, 9, 3, 10, tzinfo=tzinfo_for({"timezone": "Europe/Berlin"}))
+        monkeypatch.setattr(config_module, "now_for", lambda _: moment)
+        return client_for(create_app(FileStore(path))).get("/").get_data(as_text=True)
+
+    def test_week_and_month_days_open_it_and_the_agenda_does_not(self, tmp_path, monkeypatch):
+        page = self.page(tmp_path, monkeypatch)
+        agenda = page[page.index('<div class="board">'):page.index('<section class="view-week"')]
+        assert 'data-date=' not in agenda
+        assert page.count('class="month-cell') >= 28 and 'class="week-day' in page
+        assert 'role="button" tabindex="0"' in page
+
+    def test_the_modal_and_its_day_store_are_in_the_page_and_hidden(self, tmp_path, monkeypatch):
+        page = self.page(tmp_path, monkeypatch)
+        assert '<div class="day-modal" hidden>' in page
+        assert '<div class="day-store" hidden>' in page
+        assert 'data-heading="Thursday, 3 September"' in page
+
+    def test_an_event_title_is_escaped_in_the_modal_too(self, tmp_path, monkeypatch):
+        page = self.page(tmp_path, monkeypatch, title="<script>alert(1)</script>")
+        store = page[page.index('class="day-store"'):page.index('class="day-modal"')]
+        assert "<script>alert(1)</script>" not in store
+        assert "&lt;script&gt;alert(1)&lt;/script&gt;" in store
